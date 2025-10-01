@@ -1,11 +1,8 @@
-"""
-Shared database base for all models
-"""
+"""Shared declarative base for listings domain models."""
 
-from sqlalchemy.ext.declarative import declarative_base
+from app.core import models as core_models
 
-# Shared base for all models
-Base = declarative_base()
+# Reuse the application's core declarative base to ensure unified metadata
+Base = core_models.Base
 
-__all__ = ['Base']
-
+__all__ = ["Base"]

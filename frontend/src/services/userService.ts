@@ -1,5 +1,5 @@
 /**
- * Simple User Service for Laura AI Real Estate Assistant
+ * Simple User Service for PropertyPro AI Real Estate Assistant
  * 
  * This service provides simple user and session management without authentication
  * for the voice command system.

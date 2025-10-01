@@ -18,7 +18,7 @@ from sqlalchemy import and_, or_, desc, func
 from fastapi import HTTPException, status
 import json
 
-from models.brokerage_models import (
+from app.domain.listings.brokerage_models import (
     Brokerage, TeamPerformance, KnowledgeBase, BrandAsset,
     WorkflowAutomation, ClientNurturing, ComplianceRule,
     AgentConsistencyMetric, LeadRetentionAnalytic, WorkflowEfficiencyMetric

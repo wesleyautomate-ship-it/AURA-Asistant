@@ -30,8 +30,8 @@ from . import Base
 #         brokerage = relationship("Brokerage", back_populates="retention_analytics")
 
 class Brokerage(Base):
-    """Central entity for brokerage management and branding"""
     __tablename__ = "brokerages"
+    __table_args__ = {"extend_existing": True}
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)

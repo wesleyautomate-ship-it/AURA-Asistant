@@ -19,10 +19,10 @@ import json
 import asyncio
 from enum import Enum
 
-from models.ai_assistant_models import (
+from app.domain.listings.ai_assistant_models import (
     AIRequest, HumanExpert, ContentDeliverable, VoiceRequest
 )
-from models.brokerage_models import Brokerage
+from app.domain.listings.brokerage_models import Brokerage
 from auth.models import User
 
 logger = logging.getLogger(__name__)

@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
+
 #!/usr/bin/env python3
 """
 Comprehensive Test Runner for Dubai Real Estate RAG Chat System
@@ -101,6 +105,8 @@ class TestRunner:
 
     def run_command(self, command: List[str], timeout: int = None) -> Dict[str, Any]:
         """Run a command and return results."""
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
         try:
             self.logger.info(f"Running command: {' '.join(command)}")
             
@@ -110,10 +116,15 @@ class TestRunner:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=self.project_root
+                cwd=self.project_root,
+                env=env
             )
             end_time = time.time()
             
+            if result.returncode != 0:
+                self.logger.error(f"Command failed with exit code {result.returncode}")
+                self.logger.error(f"Stdout: {result.stdout}")
+                self.logger.error(f"Stderr: {result.stderr}")
             return {
                 "success": result.returncode == 0,
                 "returncode": result.returncode,
@@ -157,8 +168,7 @@ class TestRunner:
         
         # Setup test database
         result = self.run_command([
-            sys.executable, "-c", 
-            "from tests.conftest import test_engine; from auth.database import Base; Base.metadata.create_all(bind=test_engine)"
+            sys.executable, "scripts/create_test_db.py"
         ])
         
         if not result["success"]:
@@ -393,7 +403,7 @@ class TestRunner:
         
         # Setup environment
         if not self.setup_test_environment():
-            return {"success": False, "error": "Failed to setup test environment"}
+            return {"success": False, "error": "Failed to setup test environment", "results": {}}
         
         results = {}
         
@@ -499,12 +509,12 @@ def main():
     
     # Print summary
     if result["success"]:
-        print("✅ All tests passed!")
+        print("All tests passed!")
     else:
-        print("❌ Some tests failed!")
+        print("Some tests failed!")
         for test_type, test_result in result["results"].items():
             if not test_result.get("success", False):
-                print(f"  ❌ {test_type}: {test_result.get('error', 'Failed')}")
+                print(f"  {test_type}: {test_result.get('error', 'Failed')}")
     
     # Exit with appropriate code
     sys.exit(0 if result["success"] else 1)

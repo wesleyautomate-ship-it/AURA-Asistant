@@ -1,5 +1,5 @@
 /**
- * Voice Service for Laura AI Real Estate Assistant
+ * Voice Service for PropertyPro AI Real Estate Assistant
  * 
  * This service handles voice processing, content generation, and integration
  * with the backend voice processing endpoints.

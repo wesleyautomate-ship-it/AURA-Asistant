@@ -289,7 +289,7 @@ class TransactionHistory(Base):
     new_status = Column(String(20))
     changed_by = Column(Integer, ForeignKey('users.id'))
     change_reason = Column(Text)
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column(JSON, default=dict)
     created_at = Column(DateTime, default=func.now())
     
     # Relationships
@@ -395,7 +395,7 @@ class DocumentManagement(Base):
     is_required = Column(Boolean, default=False)
     expiry_date = Column(Date, index=True)
     status = Column(String(20), default='active', index=True)
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column(JSON, default=dict)
     
     # Relationships
     uploader = relationship("User", back_populates="uploaded_documents")

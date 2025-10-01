@@ -11,6 +11,9 @@ import logging
 import time
 from datetime import datetime, timedelta
 import json
+import uuid
+
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .database import get_db
 from .models import User, UserSession, Role, Permission, AuditLog
@@ -54,6 +57,62 @@ class AuthMiddleware:
             await self.app(scope, receive, send_with_headers)
         else:
             await self.app(scope, receive, send)
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Structured request/response logging middleware."""
+
+    def __init__(self, app, logger_name: str = "app.request"):
+        super().__init__(app)
+        self.logger = logging.getLogger(logger_name)
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        start_time = time.perf_counter()
+
+        self.logger.info(
+            "incoming_request",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "query": str(request.url.query),
+                "client": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            }
+        )
+
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            elapsed = time.perf_counter() - start_time
+            self.logger.exception(
+                "request_failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "elapsed_ms": round(elapsed * 1000, 2),
+                }
+            )
+            raise exc
+
+        elapsed = time.perf_counter() - start_time
+        self.logger.info(
+            "request_completed",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "elapsed_ms": round(elapsed * 1000, 2),
+            }
+        )
+
+        if request_id:
+            response.headers["X-Request-ID"] = request_id
+
+        return response
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),

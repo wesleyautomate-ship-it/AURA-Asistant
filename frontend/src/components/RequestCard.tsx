@@ -26,7 +26,7 @@ const AIAvatar: React.FC = () => {
             <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-white ring-2 ring-white">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
             </div>
-            <span className="text-xs font-semibold text-gray-500">Laura</span>
+            <span className="text-xs font-semibold text-gray-500">PropertyPro AI</span>
         </div>
     );
 };

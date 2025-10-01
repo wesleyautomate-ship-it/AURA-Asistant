@@ -17,9 +17,9 @@ from sqlalchemy import and_, or_, desc, func, text
 from fastapi import HTTPException, status
 import json
 
-from models.ai_assistant_models import HumanExpert, AIRequest
+from app.domain.listings.ai_assistant_models import HumanExpert, AIRequest
 from auth.models import User
-from models.brokerage_models import Brokerage
+from app.domain.listings.brokerage_models import Brokerage
 
 logger = logging.getLogger(__name__)
 

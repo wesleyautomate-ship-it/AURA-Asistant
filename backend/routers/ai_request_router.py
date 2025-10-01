@@ -24,7 +24,7 @@ import uuid
 from auth.database import get_db
 from auth.middleware import get_current_user, require_roles
 from auth.models import User
-from models.ai_request_models import AIRequestNew, AIRequestStep, Deliverable, Template, AIBrandAsset, AIRequestEvent
+from app.domain.listings.ai_request_models import AIRequestNew, AIRequestStep, Deliverable, Template, AIBrandAsset, AIRequestEvent
 from services.ai_processing_service import AIProcessingService
 from services.file_storage_service import file_storage
 

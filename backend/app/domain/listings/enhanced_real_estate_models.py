@@ -10,6 +10,12 @@ SQLAlchemy models for the enhanced real estate system including:
 - Compliance tracking
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+logger.info("Loading enhanced_real_estate_models from %s", __file__)
+print(f"Loading enhanced_real_estate_models from {__file__}")
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON, Date, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -67,6 +73,8 @@ class EnhancedProperty(Base):
     transactions = relationship("Transaction", back_populates="property")
     viewings = relationship("PropertyViewing", back_populates="property")
     compliance_records = relationship("RERACompliance", back_populates="property")
+    listing_history = relationship("ListingHistory", back_populates="property", cascade="all, delete-orphan")
+    confidential_details = relationship("PropertyConfidential", back_populates="property", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<EnhancedProperty(id={self.id}, title='{self.title}', price_aed={self.price_aed})>"
@@ -289,7 +297,7 @@ class TransactionHistory(Base):
     new_status = Column(String(20))
     changed_by = Column(Integer, ForeignKey('users.id'))
     change_reason = Column(Text)
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column(JSON, default=dict)
     created_at = Column(DateTime, default=func.now())
     
     # Relationships
@@ -298,6 +306,45 @@ class TransactionHistory(Base):
     
     def __repr__(self):
         return f"<TransactionHistory(id={self.id}, transaction_id={self.transaction_id}, change='{self.status_change}')>"
+
+
+class ListingHistory(Base):
+    """Historical log for property listing changes"""
+    __tablename__ = "listing_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey('properties.id'), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    old_value = Column(String(255))
+    new_value = Column(String(255))
+    changed_by_agent_id = Column(Integer, ForeignKey('users.id'), index=True)
+    metadata_json = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=func.now())
+
+    property = relationship("EnhancedProperty", back_populates="listing_history")
+    changed_by_agent = relationship("User")
+
+    def __repr__(self):
+        return f"<ListingHistory(id={self.id}, property_id={self.property_id}, event='{self.event_type}')>"
+
+
+class PropertyConfidential(Base):
+    """Confidential details for properties accessible by authorized users"""
+    __tablename__ = "property_confidential"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey('properties.id'), unique=True, nullable=False)
+    unit_number = Column(String(100))
+    plot_number = Column(String(100))
+    floor = Column(String(50))
+    owner_details = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    property = relationship("EnhancedProperty", back_populates="confidential_details")
+
+    def __repr__(self):
+        return f"<PropertyConfidential(id={self.id}, property_id={self.property_id})>"
 
 class PropertyViewing(Base):
     """Property viewing management"""
@@ -395,7 +442,7 @@ class DocumentManagement(Base):
     is_required = Column(Boolean, default=False)
     expiry_date = Column(Date, index=True)
     status = Column(String(20), default='active', index=True)
-    metadata = Column(JSON, default=dict)
+    metadata_json = Column(JSON, default=dict)
     
     # Relationships
     uploader = relationship("User", back_populates="uploaded_documents")

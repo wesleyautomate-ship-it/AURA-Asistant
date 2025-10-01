@@ -17,33 +17,27 @@ export interface ScheduledPost {
   scheduledAt: string; // ISO
 }
 
+
+import { apiGet, apiPost } from "./api";
+
 export const socialMediaApi = {
-  // Connections (mock)
   async getConnections(): Promise<PlatformConnection[]> {
-    return [
-      { platform: 'facebook', connected: false },
-      { platform: 'instagram', connected: false },
-      { platform: 'linkedin', connected: false },
-    ];
+    return apiGet<PlatformConnection[]>("/api/v1/social/connections");
   },
   async connect(platform: Platform): Promise<PlatformConnection> {
-    // In real implementation, redirect to OAuth flow
-    return { platform, connected: true, accountName: 'Demo Account' };
+    return apiPost<PlatformConnection>("/api/v1/social/connect", { platform });
   },
   async disconnect(platform: Platform): Promise<PlatformConnection> {
-    return { platform, connected: false };
+    return apiPost<PlatformConnection>("/api/v1/social/disconnect", { platform });
   },
-
-  // Posts (mock)
   async postNow(payload: { caption: string; imageUrl?: string; platforms: Platform[] }): Promise<{ id: string }> {
-    console.log('Posting now:', payload);
-    return { id: String(Date.now()) };
+    return apiPost<{ id: string }>("/api/v1/social/post", payload);
   },
   async schedule(payload: { caption: string; imageUrl?: string; platforms: Platform[]; scheduledAt: string }): Promise<ScheduledPost> {
-    console.log('Scheduling post:', payload);
-    return { id: String(Date.now()), ...payload };
+    return apiPost<ScheduledPost>("/api/v1/social/schedule", payload);
   },
   async listScheduled(): Promise<ScheduledPost[]> {
-    return [];
+    return apiGet<ScheduledPost[]>("/api/v1/social/scheduled");
   },
 };
+

@@ -1,12 +1,18 @@
-import { CONFIG } from '../config';
 
-export async function apiPost<T>(path: string, body: unknown, init?: RequestInit): Promise<T> {
+import { CONFIG } from '../config';
+import { useUserStore } from '../store/userStore';
+
+async function apiPost<T>(path: string, body: unknown, init?: RequestInit): Promise<T> {
+  const token = useUserStore.getState().token;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(init?.headers || {}),
+  };
+
   const res = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {})
-    },
+    headers,
     body: JSON.stringify(body),
     ...init,
   });
@@ -17,13 +23,17 @@ export async function apiPost<T>(path: string, body: unknown, init?: RequestInit
   return res.json();
 }
 
-export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = useUserStore.getState().token;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(init?.headers || {}),
+  };
+
   const res = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {})
-    },
+    headers,
     ...init,
   });
   if (!res.ok) {
@@ -32,3 +42,5 @@ export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+export { apiGet, apiPost };

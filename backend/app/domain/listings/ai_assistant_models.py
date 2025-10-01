@@ -28,7 +28,7 @@ class AIRequest(Base):
     brokerage_id = Column(Integer, ForeignKey('brokerages.id'), nullable=False, index=True)
     request_type = Column(String(50), nullable=False, index=True)  # 'cma', 'presentation', 'marketing', 'compliance', 'general'
     request_content = Column(Text, nullable=False)
-    request_metadata = Column(JSON, default=dict)
+    request_metadata_json = Column(JSON, default=dict)
     status = Column(String(20), default='pending', index=True)  # 'pending', 'processing', 'ai_complete', 'human_review', 'completed', 'failed'
     priority = Column(String(10), default='normal')  # 'low', 'normal', 'high', 'urgent'
     ai_response = Column(Text)
@@ -57,7 +57,7 @@ class AIRequest(Base):
     def request_metadata_dict(self):
         """Get request metadata as dictionary"""
         try:
-            return json.loads(self.request_metadata) if isinstance(self.request_metadata, str) else self.request_metadata
+            return json.loads(self.request_metadata_json) if isinstance(self.request_metadata_json, str) else self.request_metadata_json
         except (json.JSONDecodeError, TypeError):
             return {}
 
@@ -169,8 +169,8 @@ class TaskAutomation(Base):
     task_name = Column(String(255), nullable=False)
     task_description = Column(Text)
     automation_level = Column(String(20), default='semi')  # 'full', 'semi', 'manual'
-    trigger_conditions = Column(JSON, default=dict)
-    execution_schedule = Column(JSON, default=dict)
+    trigger_conditions_json = Column(JSON, default=dict)
+    execution_schedule_json = Column(JSON, default=dict)
     status = Column(String(20), default='active', index=True)  # 'active', 'paused', 'completed', 'failed'
     last_execution = Column(DateTime)
     next_execution = Column(DateTime, index=True)
@@ -192,7 +192,7 @@ class TaskAutomation(Base):
     def trigger_conditions_dict(self):
         """Get trigger conditions as dictionary"""
         try:
-            return json.loads(self.trigger_conditions) if isinstance(self.trigger_conditions, str) else self.trigger_conditions
+            return json.loads(self.trigger_conditions_json) if isinstance(self.trigger_conditions_json, str) else self.trigger_conditions_json
         except (json.JSONDecodeError, TypeError):
             return {}
     
@@ -200,7 +200,7 @@ class TaskAutomation(Base):
     def execution_schedule_dict(self):
         """Get execution schedule as dictionary"""
         try:
-            return json.loads(self.execution_schedule) if isinstance(self.execution_schedule, str) else self.execution_schedule
+            return json.loads(self.execution_schedule_json) if isinstance(self.execution_schedule_json, str) else self.execution_schedule_json
         except (json.JSONDecodeError, TypeError):
             return {}
 

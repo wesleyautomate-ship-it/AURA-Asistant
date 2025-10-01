@@ -1,48 +1,73 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
-from sqlalchemy import create_engine, text
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
-import os
-from sqlalchemy.orm import Session
-from app.core.middleware import get_current_user
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, joinedload
+
 from app.core.database import get_db
-from app.core.settings import DATABASE_URL as SETTINGS_DATABASE_URL
+from app.core.middleware import get_current_user, require_agent_or_admin
+from app.domain.listings.enhanced_real_estate_models import (
+    EnhancedProperty,
+    ListingHistory,
+    PropertyConfidential,
+)
 
-router = APIRouter(prefix="", tags=["properties"])
+router = APIRouter(
+    prefix="/properties",
+    tags=["Properties"],
+    dependencies=[Depends(get_current_user)]
+)
 
-# Database connection
-database_url = SETTINGS_DATABASE_URL
-engine = create_engine(database_url)
+logger = logging.getLogger(__name__)
+
+
+def _strip_nullable(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return value.strip()
+
+
+def _validate_range(min_value: Optional[float], max_value: Optional[float], field_name: str) -> None:
+    if min_value is not None and max_value is not None and min_value > max_value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field_name} minimum cannot be greater than maximum",
+        )
 
 class PropertySearchRequest(BaseModel):
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
-    bedrooms: Optional[int] = None
-    bathrooms: Optional[int] = None
-    property_type: Optional[str] = None
-    location: Optional[str] = None
-    min_area_sqft: Optional[float] = None
-    max_area_sqft: Optional[float] = None
+    min_price: Optional[float] = Field(default=None, ge=0)
+    max_price: Optional[float] = Field(default=None, ge=0)
+    bedrooms: Optional[int] = Field(default=None, ge=0)
+    bathrooms: Optional[int] = Field(default=None, ge=0)
+    property_type: Optional[str] = Field(default=None, min_length=1)
+    location: Optional[str] = Field(default=None, min_length=1)
+    min_area_sqft: Optional[float] = Field(default=None, ge=0)
+    max_area_sqft: Optional[float] = Field(default=None, ge=0)
+
 
 class PropertyCreate(BaseModel):
-    title: str
-    description: str
-    price: float
-    location: str
-    property_type: str
-    bedrooms: int
-    bathrooms: int
-    area_sqft: Optional[float] = None
+    title: str = Field(..., min_length=3, max_length=255)
+    description: str = Field(..., min_length=10)
+    price: float = Field(..., gt=0)
+    location: str = Field(..., min_length=2, max_length=255)
+    property_type: str = Field(..., min_length=2, max_length=120)
+    bedrooms: int = Field(..., ge=0)
+    bathrooms: int = Field(..., ge=0)
+    area_sqft: Optional[float] = Field(default=None, gt=0)
+
 
 class PropertyUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    location: Optional[str] = None
-    property_type: Optional[str] = None
-    bedrooms: Optional[int] = None
-    bathrooms: Optional[int] = None
-    area_sqft: Optional[float] = None
+    title: Optional[str] = Field(default=None, min_length=3, max_length=255)
+    description: Optional[str] = Field(default=None, min_length=10)
+    price: Optional[float] = Field(default=None, gt=0)
+    location: Optional[str] = Field(default=None, min_length=2, max_length=255)
+    property_type: Optional[str] = Field(default=None, min_length=2, max_length=120)
+    bedrooms: Optional[int] = Field(default=None, ge=0)
+    bathrooms: Optional[int] = Field(default=None, ge=0)
+    area_sqft: Optional[float] = Field(default=None, gt=0)
 
 class PropertyResponse(BaseModel):
     id: int
@@ -55,78 +80,83 @@ class PropertyResponse(BaseModel):
     bathrooms: int
     area_sqft: Optional[float] = None
 
+
 class PropertyDetailsResponse(BaseModel):
     property: PropertyResponse
     similar_properties: List[PropertyResponse]
     market_analysis: Dict[str, Any]
     neighborhood_info: Dict[str, Any]
 
+
+class PaginationMeta(BaseModel):
+    page: int
+    limit: int
+    total: int
+    pages: int
+
+
+class PropertySearchResponse(BaseModel):
+    properties: List[PropertyResponse]
+    pagination: PaginationMeta
+
+
+def _property_to_response(prop: EnhancedProperty) -> PropertyResponse:
+    price_value = prop.price_aed or prop.price or 0
+    return PropertyResponse(
+        id=prop.id,
+        title=prop.title or "",
+        description=prop.description or "",
+        price=float(price_value),
+        location=prop.location or "",
+        property_type=prop.property_type or "Unknown",
+        bedrooms=prop.bedrooms or 0,
+        bathrooms=prop.bathrooms or 0,
+        area_sqft=float(prop.area_sqft) if prop.area_sqft is not None else None,
+    )
+
 @router.get("/", response_model=List[PropertyResponse])
-async def get_all_properties():
+async def get_all_properties(db: Session = Depends(get_db)):
     """Get all properties from the database"""
     try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT id, title, description, price, location, property_type, bedrooms, bathrooms, area_sqft FROM properties"))
-            properties = []
-            for row in result:
-                properties.append(PropertyResponse(
-                    id=row[0],
-                    title=row[1],
-                    description=row[2],
-                    price=float(row[3]),
-                    location=row[4],
-                    property_type=row[5],
-                    bedrooms=row[6],
-                    bathrooms=row[7],
-                    area_sqft=float(row[8]) if row[8] else None
-                ))
-            return properties
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        query = select(EnhancedProperty).where(EnhancedProperty.is_deleted.is_(False))
+        rows = db.execute(query).scalars().all()
+        return [_property_to_response(prop) for prop in rows]
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to fetch properties")
+        raise HTTPException(status_code=500, detail="Failed to fetch properties") from exc
 
-@router.post("/", response_model=PropertyResponse)
-async def create_property(property_data: PropertyCreate):
+
+@router.post("/", response_model=PropertyResponse, dependencies=[Depends(require_agent_or_admin)])
+async def create_property(property_data: PropertyCreate, db: Session = Depends(get_db)):
     """Create a new property"""
     try:
-        query = """
-        INSERT INTO properties (title, description, price, location, property_type, bedrooms, bathrooms, area_sqft)
-        VALUES (:title, :description, :price, :location, :property_type, :bedrooms, :bathrooms, :area_sqft)
-        RETURNING id, title, description, price, location, property_type, bedrooms, bathrooms, area_sqft
-        """
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(query), {
-                "title": property_data.title,
-                "description": property_data.description,
-                "price": property_data.price,
-                "location": property_data.location,
-                "property_type": property_data.property_type,
-                "bedrooms": property_data.bedrooms,
-                "bathrooms": property_data.bathrooms,
-                "area_sqft": property_data.area_sqft
-            })
-            conn.commit()
-            
-            row = result.fetchone()
-            if row:
-                return PropertyResponse(
-                    id=row[0],
-                    title=row[1],
-                    description=row[2],
-                    price=float(row[3]),
-                    location=row[4],
-                    property_type=row[5],
-                    bedrooms=row[6],
-                    bathrooms=row[7],
-                    area_sqft=float(row[8]) if row[8] else None
-                )
-            else:
-                raise HTTPException(status_code=500, detail="Failed to create property")
-                
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        title = property_data.title.strip()
+        description = property_data.description.strip()
+        location = property_data.location.strip()
+        property_type = property_data.property_type.strip()
 
-@router.get("/search", response_model=List[PropertyResponse])
+        prop = EnhancedProperty(
+            title=title,
+            description=description,
+            price_aed=property_data.price,
+            price=property_data.price,
+            location=location,
+            property_type=property_type,
+            bedrooms=property_data.bedrooms,
+            bathrooms=property_data.bathrooms,
+            area_sqft=property_data.area_sqft,
+        )
+        db.add(prop)
+        db.commit()
+        db.refresh(prop)
+
+        return _property_to_response(prop)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to create property")
+        raise HTTPException(status_code=500, detail="Failed to create property") from exc
+
+@router.get("/search", response_model=PropertySearchResponse)
 async def search_properties(
     min_price: Optional[float] = Query(None, description="Minimum price"),
     max_price: Optional[float] = Query(None, description="Maximum price"),
@@ -140,338 +170,221 @@ async def search_properties(
     limit: int = Query(20, ge=1, le=100, description="Number of results to return")
 ):
     """Advanced property search with multiple filters and pagination"""
-    
+
+    _validate_range(min_price, max_price, "Price")
+    _validate_range(min_area_sqft, max_area_sqft, "Area (sqft)")
+
     try:
-        with engine.connect() as conn:
-            # Calculate offset for pagination
-            offset = (page - 1) * limit
-            
-            # Build dynamic SQL query with pagination
-            query = """
-                SELECT id, title, description, price, location, property_type, 
-                       bedrooms, bathrooms, area_sqft
-                FROM properties WHERE 1=1
-            """
-            params = {}
-            
-            if min_price is not None:
-                query += " AND price >= :min_price"
-                params["min_price"] = min_price
-            
-            if max_price is not None:
-                query += " AND price <= :max_price"
-                params["max_price"] = max_price
-            
-            if bedrooms is not None:
-                query += " AND bedrooms = :bedrooms"
-                params["bedrooms"] = bedrooms
-            
-            if bathrooms is not None:
-                query += " AND bathrooms = :bathrooms"
-                params["bathrooms"] = bathrooms
-            
-            if property_type:
-                query += " AND property_type ILIKE :property_type"
-                params["property_type"] = f"%{property_type}%"
-            
-            if location:
-                query += " AND location ILIKE :location"
-                params["location"] = f"%{location}%"
-            
-            if min_area_sqft is not None:
-                query += " AND area_sqft >= :min_area_sqft"
-                params["min_area_sqft"] = min_area_sqft
-            
-            if max_area_sqft is not None:
-                query += " AND area_sqft <= :max_area_sqft"
-                params["max_area_sqft"] = max_area_sqft
-            
-            # Add pagination
-            query += " ORDER BY id DESC LIMIT :limit OFFSET :offset"
-            params["limit"] = limit
-            params["offset"] = offset
-            
-            result = conn.execute(text(query), params)
-            properties = []
-            
-            for row in result:
-                properties.append(PropertyResponse(
-                    id=row[0],
-                    title=row[1],
-                    description=row[2],
-                    price=float(row[3]) if row[3] else 0.0,
-                    location=row[4] if row[4] else "",
-                    property_type=row[5] if row[5] else "Unknown",
-                    bedrooms=row[6] if row[6] else 0,
-                    bathrooms=row[7] if row[7] else 0,
-                    area_sqft=float(row[8]) if row[8] else None
-                ))
-            
-            # Get total count for pagination
-            count_query = "SELECT COUNT(*) FROM properties WHERE 1=1"
-            count_params = {}
-            
-            # Add same filters to count query
-            if min_price is not None:
-                count_query += " AND price >= :min_price"
-                count_params["min_price"] = min_price
-            if max_price is not None:
-                count_query += " AND price <= :max_price"
-                count_params["max_price"] = max_price
-            if bedrooms is not None:
-                count_query += " AND bedrooms = :bedrooms"
-                count_params["bedrooms"] = bedrooms
-            if bathrooms is not None:
-                count_query += " AND bathrooms = :bathrooms"
-                count_params["bathrooms"] = bathrooms
-            if property_type:
-                count_query += " AND property_type ILIKE :property_type"
-                count_params["property_type"] = f"%{property_type}%"
-            if location:
-                count_query += " AND location ILIKE :location"
-                count_params["location"] = f"%{location}%"
-            if min_area_sqft is not None:
-                count_query += " AND area_sqft >= :min_area_sqft"
-                count_params["min_area_sqft"] = min_area_sqft
-            if max_area_sqft is not None:
-                count_query += " AND area_sqft <= :max_area_sqft"
-                count_params["max_area_sqft"] = max_area_sqft
-            
-            count_result = conn.execute(text(count_query), count_params)
-            total_count = count_result.fetchone()[0]
-            
-            return {
-                "properties": properties,
-                "pagination": {
-                    "page": page,
-                    "limit": limit,
-                    "total": total_count,
-                    "pages": (total_count + limit - 1) // limit
-                }
-            }
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        query = select(EnhancedProperty).where(EnhancedProperty.is_deleted.is_(False))
+
+        if min_price is not None:
+            query = query.where((EnhancedProperty.price_aed >= min_price) | (EnhancedProperty.price >= min_price))
+        if max_price is not None:
+            query = query.where((EnhancedProperty.price_aed <= max_price) | (EnhancedProperty.price <= max_price))
+        if bedrooms is not None:
+            query = query.where(EnhancedProperty.bedrooms == bedrooms)
+        if bathrooms is not None:
+            query = query.where(EnhancedProperty.bathrooms == bathrooms)
+        if property_type:
+            query = query.where(func.lower(EnhancedProperty.property_type).like(f"%{property_type.lower()}%"))
+        if location:
+            query = query.where(func.lower(EnhancedProperty.location).like(f"%{location.lower()}%"))
+        if min_area_sqft is not None:
+            query = query.where(EnhancedProperty.area_sqft >= min_area_sqft)
+        if max_area_sqft is not None:
+            query = query.where(EnhancedProperty.area_sqft <= max_area_sqft)
+
+        total_count = db.execute(query.with_only_columns(func.count()).order_by(None)).scalar_one()
+
+        offset = (page - 1) * limit
+        rows = db.execute(query.order_by(EnhancedProperty.id.desc()).offset(offset).limit(limit)).scalars().all()
+
+        return PropertySearchResponse(
+            properties=[_property_to_response(prop) for prop in rows],
+            pagination=PaginationMeta(
+                page=page,
+                limit=limit,
+                total=total_count,
+                pages=(total_count + limit - 1) // limit,
+            ),
+        )
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to search properties")
+        raise HTTPException(status_code=500, detail="Failed to search properties") from exc
 
 @router.get("/{property_id}", response_model=PropertyDetailsResponse)
-async def get_property_details(property_id: int):
+async def get_property_details(property_id: int, db: Session = Depends(get_db)):
     """Get detailed information about a specific property"""
     try:
-        # Get property details
-        property_query = "SELECT * FROM properties WHERE id = :property_id"
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(property_query), {"property_id": property_id})
-            property_row = result.fetchone()
-            
-            if not property_row:
-                raise HTTPException(status_code=404, detail="Property not found")
-            
-            property_data = PropertyResponse(
-                id=property_row[0],
-                title=property_row[1],
-                description=property_row[2],
-                price=float(property_row[3]) if property_row[3] else 0.0,
-                location=property_row[4] if property_row[4] else "",
-                property_type=property_row[5] if property_row[5] else "Unknown",
-                bedrooms=property_row[6] if property_row[6] else 0,
-                bathrooms=property_row[7] if property_row[7] else 0,
-                area_sqft=float(property_row[8]) if property_row[8] else None
+        property_obj = db.execute(
+            select(EnhancedProperty).options(joinedload(EnhancedProperty.confidential_details)).where(EnhancedProperty.id == property_id)
+        ).scalar_one_or_none()
+
+        if not property_obj or property_obj.is_deleted:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        property_data = _property_to_response(property_obj)
+        price_value = property_data.price
+        price_range = price_value * 0.2 if price_value else 0
+        min_price = max(price_value - price_range, 0)
+        max_price = price_value + price_range
+
+        similar_properties: List[PropertyResponse] = []
+        if property_obj.property_type:
+            price_column = func.coalesce(EnhancedProperty.price_aed, EnhancedProperty.price)
+            similar_query = (
+                select(EnhancedProperty)
+                .where(
+                    EnhancedProperty.property_type == property_obj.property_type,
+                    EnhancedProperty.id != property_id,
+                    EnhancedProperty.is_deleted.is_(False),
+                    price_column.between(min_price, max_price),
+                )
+                .limit(5)
             )
-            
-            # Get similar properties (same type, similar price range)
-            similar_query = """
-            SELECT * FROM properties 
-            WHERE property_type = :property_type 
-            AND id != :property_id
-            AND price BETWEEN :min_price AND :max_price
-            LIMIT 5
-            """
-            
-            price_range = property_data.price * 0.2  # 20% range
-            similar_result = conn.execute(text(similar_query), {
-                "property_type": property_data.property_type,
-                "property_id": property_id,
-                "min_price": property_data.price - price_range,
-                "max_price": property_data.price + price_range
-            })
-            
-            similar_properties = []
-            for row in similar_result:
-                similar_properties.append(PropertyResponse(
-                    id=row[0],
-                    title=row[1],
-                    description=row[2],
-                    price=float(row[3]) if row[3] else 0.0,
-                    location=row[4] if row[4] else "",
-                    property_type=row[5] if row[5] else "Unknown",
-                    bedrooms=row[6] if row[6] else 0,
-                    bathrooms=row[7] if row[7] else 0,
-                    area_sqft=float(row[8]) if row[8] else None
-                ))
-            
-            # Mock market analysis and neighborhood info
-            market_analysis = {
-                "average_price": property_data.price * 1.1,
-                "price_trend": "increasing",
-                "days_on_market": 15,
-                "price_per_sqft": property_data.price / (property_data.area_sqft or 1000)
-            }
-            
-            neighborhood_info = {
-                "schools": ["Dubai International School", "American School of Dubai"],
-                "amenities": ["Shopping Mall", "Park", "Hospital"],
-                "transportation": ["Metro Station", "Bus Stop"],
-                "crime_rate": "Low"
-            }
-            
-            return PropertyDetailsResponse(
-                property=property_data,
-                similar_properties=similar_properties,
-                market_analysis=market_analysis,
-                neighborhood_info=neighborhood_info
-            )
-            
+            similar_rows = db.execute(similar_query).scalars().all()
+            similar_properties = [_property_to_response(row) for row in similar_rows]
+
+        market_analysis = {
+            "average_price": price_value * 1.1 if price_value else 0,
+            "price_trend": "increasing",
+            "days_on_market": 15,
+            "price_per_sqft": price_value / (float(property_obj.area_sqft) or 1000) if price_value else 0,
+        }
+
+        neighborhood_info = {
+            "schools": ["Dubai International School", "American School of Dubai"],
+            "amenities": ["Shopping Mall", "Park", "Hospital"],
+            "transportation": ["Metro Station", "Bus Stop"],
+            "crime_rate": "Low",
+        }
+
+        return PropertyDetailsResponse(
+            property=property_data,
+            similar_properties=similar_properties,
+            market_analysis=market_analysis,
+            neighborhood_info=neighborhood_info,
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to fetch property details", extra={"property_id": property_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch property details") from exc
 
-@router.put("/{property_id}", response_model=PropertyResponse)
-async def update_property(property_id: int, property_data: PropertyUpdate):
+@router.put(
+    "/{property_id}",
+    response_model=PropertyResponse,
+    dependencies=[Depends(require_agent_or_admin)]
+)
+async def update_property(property_id: int, property_data: PropertyUpdate, db: Session = Depends(get_db)):
     """Update an existing property"""
     try:
-        # Check if property exists
-        check_query = "SELECT id FROM properties WHERE id = :property_id"
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(check_query), {"property_id": property_id})
-            if not result.fetchone():
-                raise HTTPException(status_code=404, detail="Property not found")
-            
-            # Build dynamic update query
-            update_fields = []
-            params = {"property_id": property_id}
-            
-            if property_data.title is not None:
-                update_fields.append("title = :title")
-                params["title"] = property_data.title
-            
-            if property_data.description is not None:
-                update_fields.append("description = :description")
-                params["description"] = property_data.description
-            
-            if property_data.price is not None:
-                update_fields.append("price = :price")
-                params["price"] = property_data.price
-            
-            if property_data.location is not None:
-                update_fields.append("location = :location")
-                params["location"] = property_data.location
-            
-            if property_data.property_type is not None:
-                update_fields.append("property_type = :property_type")
-                params["property_type"] = property_data.property_type
-            
-            if property_data.bedrooms is not None:
-                update_fields.append("bedrooms = :bedrooms")
-                params["bedrooms"] = property_data.bedrooms
-            
-            if property_data.bathrooms is not None:
-                update_fields.append("bathrooms = :bathrooms")
-                params["bathrooms"] = property_data.bathrooms
-            
-            if property_data.area_sqft is not None:
-                update_fields.append("area_sqft = :area_sqft")
-                params["area_sqft"] = property_data.area_sqft
-            
-            if not update_fields:
-                raise HTTPException(status_code=400, detail="No fields to update")
-            
-            update_query = f"""
-            UPDATE properties 
-            SET {', '.join(update_fields)}
-            WHERE id = :property_id
-            RETURNING id, title, description, price, location, property_type, bedrooms, bathrooms, area_sqft
-            """
-            
-            result = conn.execute(text(update_query), params)
-            conn.commit()
-            
-            row = result.fetchone()
-            if row:
-                return PropertyResponse(
-                    id=row[0],
-                    title=row[1],
-                    description=row[2],
-                    price=float(row[3]),
-                    location=row[4],
-                    property_type=row[5],
-                    bedrooms=row[6],
-                    bathrooms=row[7],
-                    area_sqft=float(row[8]) if row[8] else None
-                )
-            else:
-                raise HTTPException(status_code=500, detail="Failed to update property")
-                
+        property_obj = db.get(EnhancedProperty, property_id)
+        if not property_obj or property_obj.is_deleted:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        updated = False
+
+        if property_data.title is not None:
+            property_obj.title = property_data.title.strip()
+            updated = True
+
+        if property_data.description is not None:
+            property_obj.description = property_data.description.strip()
+            updated = True
+
+        if property_data.price is not None:
+            property_obj.price_aed = property_data.price
+            property_obj.price = property_data.price
+            updated = True
+
+        if property_data.location is not None:
+            property_obj.location = _strip_nullable(property_data.location) or ""
+            updated = True
+
+        if property_data.property_type is not None:
+            property_obj.property_type = _strip_nullable(property_data.property_type) or property_obj.property_type
+            updated = True
+
+        if property_data.bedrooms is not None:
+            property_obj.bedrooms = property_data.bedrooms
+            updated = True
+
+        if property_data.bathrooms is not None:
+            property_obj.bathrooms = property_data.bathrooms
+            updated = True
+
+        if property_data.area_sqft is not None:
+            property_obj.area_sqft = property_data.area_sqft
+            updated = True
+
+        if not updated:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        db.add(property_obj)
+        db.commit()
+        db.refresh(property_obj)
+
+        return _property_to_response(property_obj)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to update property", extra={"property_id": property_id})
+        raise HTTPException(status_code=500, detail="Failed to update property") from exc
 
-@router.delete("/{property_id}")
-async def delete_property(property_id: int):
+@router.delete(
+    "/{property_id}",
+    dependencies=[Depends(require_agent_or_admin)]
+)
+async def delete_property(property_id: int, db: Session = Depends(get_db)):
     """Delete a property"""
     try:
-        with engine.connect() as conn:
-            # Check if property exists
-            check_query = "SELECT id FROM properties WHERE id = :property_id"
-            result = conn.execute(text(check_query), {"property_id": property_id})
-            
-            if not result.fetchone():
-                raise HTTPException(status_code=404, detail="Property not found")
-            
-            # Delete property
-            delete_query = "DELETE FROM properties WHERE id = :property_id"
-            conn.execute(text(delete_query), {"property_id": property_id})
-            conn.commit()
-            
-            return {"message": "Property deleted successfully"}
-            
+        property_obj = db.get(EnhancedProperty, property_id)
+        if not property_obj or property_obj.is_deleted:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        property_obj.is_deleted = True
+        db.add(property_obj)
+        db.commit()
+
+        return {"message": "Property deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to delete property", extra={"property_id": property_id})
+        raise HTTPException(status_code=500, detail="Failed to delete property") from exc
 
 @router.get("/types/list")
-async def get_property_types():
+async def get_property_types(db: Session = Depends(get_db)):
     """Get list of available property types"""
     try:
-        query = "SELECT DISTINCT property_type FROM properties WHERE property_type IS NOT NULL"
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(query))
-            types = [row[0] for row in result if row[0]]
-            
-            return {"property_types": types}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        query = (
+            select(func.distinct(EnhancedProperty.property_type))
+            .where(EnhancedProperty.property_type.isnot(None))
+            .where(EnhancedProperty.property_type != "")
+        )
+        rows = db.execute(query).scalars().all()
+        return {"property_types": rows}
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to fetch property types")
+        raise HTTPException(status_code=500, detail="Failed to fetch property types") from exc
 
 @router.get("/locations/list")
-async def get_property_locations():
+async def get_property_locations(db: Session = Depends(get_db)):
     """Get list of available property locations"""
     try:
-        query = "SELECT DISTINCT location FROM properties WHERE location IS NOT NULL"
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(query))
-            locations = [row[0] for row in result if row[0]]
-            
-            return {"locations": locations}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        query = (
+            select(func.distinct(EnhancedProperty.location))
+            .where(EnhancedProperty.location.isnot(None))
+            .where(EnhancedProperty.location != "")
+        )
+        rows = db.execute(query).scalars().all()
+        return {"locations": rows}
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to fetch property locations")
+        raise HTTPException(status_code=500, detail="Failed to fetch property locations") from exc
 
 # --- Phase 1: Granular Data & Security Foundation ---
 
@@ -489,57 +402,34 @@ async def update_property_status(
         raise HTTPException(status_code=400, detail="Invalid status provided.")
 
     try:
-        with engine.connect() as conn:
-            # Find the property and verify ownership
-            property_query = """
-                SELECT id, listing_status, agent_id 
-                FROM properties 
-                WHERE id = :property_id
-            """
-            result = conn.execute(text(property_query), {"property_id": property_id})
-            property_to_update = result.fetchone()
-            
-            if not property_to_update:
-                raise HTTPException(status_code=404, detail="Property not found.")
+        property_obj = db.get(EnhancedProperty, property_id)
+        if not property_obj or property_obj.is_deleted:
+            raise HTTPException(status_code=404, detail="Property not found.")
 
-            # Ensure the current user is the agent assigned to this property or an admin
-            if property_to_update.agent_id != current_user.id and current_user.role != 'admin':
-                raise HTTPException(status_code=403, detail="Not authorized to update this property.")
+        if property_obj.agent_id != current_user.id and getattr(current_user, "role", None) != "admin":
+            raise HTTPException(status_code=403, detail="Not authorized to update this property.")
 
-            # Log the change in listing_history
-            history_query = """
-                INSERT INTO listing_history (
-                    property_id, event_type, old_value, new_value, changed_by_agent_id
-                ) VALUES (
-                    :property_id, 'status_change', :old_value, :new_value, :changed_by_agent_id
-                )
-            """
-            conn.execute(text(history_query), {
-                "property_id": property_id,
-                "old_value": property_to_update.listing_status,
-                "new_value": new_status,
-                "changed_by_agent_id": current_user.id
-            })
+        old_status = property_obj.listing_status
+        property_obj.listing_status = new_status
 
-            # Update the status
-            update_query = """
-                UPDATE properties 
-                SET listing_status = :new_status 
-                WHERE id = :property_id
-            """
-            conn.execute(text(update_query), {
-                "property_id": property_id,
-                "new_status": new_status
-            })
-            
-            conn.commit()
+        history_entry = ListingHistory(
+            property_id=property_obj.id,
+            event_type="status_change",
+            old_value=old_status,
+            new_value=new_status,
+            changed_by_agent_id=current_user.id,
+        )
+        db.add(history_entry)
+        db.add(property_obj)
+        db.commit()
 
-            return {"message": f"Property {property_id} status updated to {new_status}."}
-            
+        return {"message": f"Property {property_id} status updated to {new_status}."}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to update property status", extra={"property_id": property_id})
+        raise HTTPException(status_code=500, detail="Failed to update property status") from exc
 
 @router.get("/{property_id}/confidential", tags=["Properties"])
 async def get_confidential_property_data(
@@ -549,49 +439,29 @@ async def get_confidential_property_data(
 ):
     """Get confidential property data with access control"""
     try:
-        with engine.connect() as conn:
-            # Get the property to check ownership
-            property_query = """
-                SELECT id, agent_id 
-                FROM properties 
-                WHERE id = :property_id
-            """
-            result = conn.execute(text(property_query), {"property_id": property_id})
-            property_record = result.fetchone()
-            
-            if not property_record:
-                raise HTTPException(status_code=404, detail="Property not found.")
+        property_obj = db.get(EnhancedProperty, property_id)
+        if not property_obj or property_obj.is_deleted:
+            raise HTTPException(status_code=404, detail="Property not found.")
 
-            # Access Control Algorithm: User must be an admin/manager or the assigned agent
-            is_authorized = (
-                current_user.role in ['admin', 'manager'] or
-                property_record.agent_id == current_user.id
-            )
+        user_role = getattr(current_user, "role", None)
+        is_authorized = user_role in ["admin", "manager"] or property_obj.agent_id == current_user.id
 
-            if not is_authorized:
-                raise HTTPException(status_code=403, detail="You do not have permission to view these details.")
+        if not is_authorized:
+            raise HTTPException(status_code=403, detail="You do not have permission to view these details.")
 
-            # Fetch the confidential data
-            confidential_query = """
-                SELECT unit_number, plot_number, floor, owner_details, created_at
-                FROM property_confidential 
-                WHERE property_id = :property_id
-            """
-            result = conn.execute(text(confidential_query), {"property_id": property_id})
-            confidential_data = result.fetchone()
-            
-            if not confidential_data:
-                raise HTTPException(status_code=404, detail="Confidential data not found for this property.")
+        confidential_data = property_obj.confidential_details
+        if not confidential_data:
+            raise HTTPException(status_code=404, detail="Confidential data not found for this property.")
 
-            return {
-                "unit_number": confidential_data.unit_number,
-                "plot_number": confidential_data.plot_number,
-                "floor": confidential_data.floor,
-                "owner_details": confidential_data.owner_details,
-                "created_at": confidential_data.created_at
-            }
-            
+        return {
+            "unit_number": confidential_data.unit_number,
+            "plot_number": confidential_data.plot_number,
+            "floor": confidential_data.floor,
+            "owner_details": confidential_data.owner_details,
+            "created_at": confidential_data.created_at,
+        }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to fetch confidential property data", extra={"property_id": property_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch confidential property data") from exc

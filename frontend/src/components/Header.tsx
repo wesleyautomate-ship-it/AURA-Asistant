@@ -6,7 +6,7 @@ const Header: React.FC = () => {
             <div className="flex justify-between items-center">
                     {/* App Logo */}
                     <div className="flex items-baseline space-x-1">
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tighter">Laura AI</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tighter">PropertyPro AI</h1>
                     </div>
 
                 <div className="flex items-center space-x-4">

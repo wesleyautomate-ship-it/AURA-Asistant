@@ -23,9 +23,9 @@ import wave
 import io
 from pathlib import Path
 
-from models.ai_assistant_models import VoiceRequest, AIRequest
+from app.domain.listings.ai_assistant_models import VoiceRequest, AIRequest
 from auth.models import User
-from models.brokerage_models import Brokerage
+from app.domain.listings.brokerage_models import Brokerage
 
 logger = logging.getLogger(__name__)
 

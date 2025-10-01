@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from services.property_detection_service import PropertyDetectionService
 from services.document_processing_service import DocumentProcessingService
 from auth import get_current_user
-from models.user_models import User
+from auth.models import User
 
 logger = logging.getLogger(__name__)
 

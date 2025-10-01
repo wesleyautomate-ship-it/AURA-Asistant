@@ -16,7 +16,7 @@ import shutil
 
 from services.intelligent_data_sorter import IntelligentDataSorter
 from auth import get_current_user, require_admin
-from models.user_models import User
+from auth.models import User
 
 logger = logging.getLogger(__name__)
 

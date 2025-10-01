@@ -12,6 +12,20 @@ export interface ActionItem {
 
 export type ActionId = ActionItem['id'];
 
+export type CommandRequest =
+    | {
+          kind: 'text';
+          prompt: string;
+          quickAction?: string | null;
+      }
+    | {
+          kind: 'audio';
+          transcript: string;
+          mimeType: string;
+          duration: number;
+          audioBlob: Blob;
+      };
+
 export interface ChatMessage {
     id: number;
     text: string;

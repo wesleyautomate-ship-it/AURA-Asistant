@@ -26,8 +26,9 @@ CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8002"))
 # Google AI Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
+    pass
     # Enforce env-only to avoid accidental leakage/hardcoding
-    print("⚠️  GOOGLE_API_KEY is not set. Some AI features will be disabled.")
+    
 
 # Reelly API removed
 

@@ -1,3 +1,4 @@
+from app.core.models import Base
 """
 Database connection and session management for authentication
 """
@@ -69,7 +70,7 @@ def init_db():
     """
     Initialize database tables
     """
-    from .models import Base
+    from app.core.models import Base
     
     try:
         # Create all tables

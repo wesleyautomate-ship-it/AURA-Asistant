@@ -18,7 +18,7 @@ from auth.database import get_db
 from auth.token_manager import get_current_user
 from auth.models import User
 from services.brokerage_management_service import BrokerageManagementService
-from models.brokerage_models import TeamPerformance, AgentConsistencyMetric
+from app.domain.listings.brokerage_models import TeamPerformance, AgentConsistencyMetric
 
 logger = logging.getLogger(__name__)
 

@@ -18,9 +18,12 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import sys
 import os
-# Add the parent directory to sys.path so we can import app modules
-backend_dir = os.path.dirname(os.path.dirname(__file__))
-sys.path.insert(0, backend_dir)
+
+# Add the backend root directory to sys.path so we can import the `app` package
+backend_app_dir = os.path.dirname(os.path.dirname(__file__))
+backend_root_dir = os.path.dirname(backend_app_dir)
+if backend_root_dir not in sys.path:
+    sys.path.insert(0, backend_root_dir)
 
 # Ensure Alembic uses the same DATABASE_URL as the app settings
 try:
@@ -31,11 +34,22 @@ except Exception as e:
     # Fall back to alembic.ini if settings import fails
     pass
 
+target_metadata = None
+
 try:
-    from app.core.models import Base
-    target_metadata = Base.metadata
+    from app.core import models as core_models
+
+    # Ensure brokerage/listing models reuse the core declarative base so relationships resolve
+    import app.domain.listings as listings_package
+
+    listings_package.Base = core_models.Base
+
+    # Import modules that declare tables onto the shared Base
+    from app.domain.listings import brokerage_models  # noqa: F401
+    from app.domain.listings import enhanced_real_estate_models  # noqa: F401
+
+    target_metadata = core_models.Base.metadata
 except ImportError:
-    # Fallback if models can't be imported
     target_metadata = None
 
 # other values from the config, defined by the needs of env.py,

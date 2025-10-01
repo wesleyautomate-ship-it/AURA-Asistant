@@ -6,11 +6,13 @@ FastAPI router providing CRUD for transactions and simple status updates.
 Aligns to `Transaction` model in enhanced models and frontend needs.
 """
 
+import logging
 from typing import List, Optional, Dict, Any
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +20,8 @@ from app.core.middleware import get_current_user, require_agent_or_admin
 from app.core.models import User
 from app.domain.listings.enhanced_real_estate_models import Transaction, TransactionHistory
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/transactions", tags=["Transactions"])
 
@@ -93,8 +97,9 @@ async def list_transactions(
     try:
         query = db.query(Transaction).order_by(Transaction.id.desc()).offset(offset).limit(limit)
         return [TransactionResponse.model_validate(obj) for obj in query.all()]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list transactions: {str(e)}")
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to list transactions")
+        raise HTTPException(status_code=500, detail="Failed to list transactions") from exc
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
@@ -138,9 +143,10 @@ async def create_transaction(
         db.commit()
         db.refresh(obj)
         return TransactionResponse.model_validate(obj)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create transaction: {str(e)}")
+        logger.exception("Failed to create transaction")
+        raise HTTPException(status_code=500, detail="Failed to create transaction") from exc
 
 
 @router.put("/{transaction_id}", response_model=TransactionResponse, dependencies=[Depends(require_agent_or_admin)])
@@ -174,9 +180,10 @@ async def update_transaction(
             db.commit()
 
         return TransactionResponse.model_validate(obj)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to update transaction: {str(e)}")
+        logger.exception("Failed to update transaction", extra={"transaction_id": transaction_id})
+        raise HTTPException(status_code=500, detail="Failed to update transaction") from exc
 
 
 @router.post("/{transaction_id}/status", response_model=TransactionResponse, dependencies=[Depends(require_agent_or_admin)])
@@ -208,9 +215,10 @@ async def change_status(
         db.commit()
 
         return TransactionResponse.model_validate(obj)
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to change status: {str(e)}")
+        logger.exception("Failed to change transaction status", extra={"transaction_id": transaction_id})
+        raise HTTPException(status_code=500, detail="Failed to change transaction status") from exc
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_agent_or_admin)])
@@ -226,8 +234,9 @@ async def delete_transaction(
         db.delete(obj)
         db.commit()
         return None
-    except Exception as e:
+    except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete transaction: {str(e)}")
+        logger.exception("Failed to delete transaction", extra={"transaction_id": transaction_id})
+        raise HTTPException(status_code=500, detail="Failed to delete transaction") from exc
 
 

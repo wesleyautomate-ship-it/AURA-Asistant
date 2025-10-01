@@ -51,7 +51,7 @@ class AIRequestNew(Base):
     completed_at = Column(DateTime, nullable=True)
     
     # Metadata
-    request_metadata = Column(JSON, default=dict)
+    request_metadata_json = Column(JSON, default=dict)
     
     # Relationships
     user = relationship("User", foreign_keys=[user_id], back_populates="ai_requests_new")
@@ -79,7 +79,7 @@ class AIRequestStep(Base):
     # Results and metadata
     result = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
-    step_metadata = Column(JSON, default=dict)
+    step_metadata_json = Column(JSON, default=dict)
     
     # Relationships
     request = relationship("AIRequestNew", back_populates="steps")
@@ -104,7 +104,7 @@ class Deliverable(Base):
     
     # Status and metadata
     status = Column(String(20), default='generating')  # 'generating', 'ready', 'failed'
-    deliverable_metadata = Column(JSON, default=dict)
+    deliverable_metadata_json = Column(JSON, default=dict)
     
     # Timing
     created_at = Column(DateTime, default=func.now())
@@ -129,7 +129,7 @@ class Template(Base):
     
     # Metadata
     is_active = Column(Boolean, default=True)
-    template_metadata = Column(JSON, default=dict)
+    template_metadata_json = Column(JSON, default=dict)
     
     # Timing
     created_at = Column(DateTime, default=func.now())

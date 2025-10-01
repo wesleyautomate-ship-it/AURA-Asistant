@@ -59,7 +59,86 @@ class DocumentIngestionResponse(BaseModel):
     message: str
     error: Optional[str] = None
 
+
+from services.human_expertise_service import HumanExpertiseService
+from services.ai_request_processing_service import AIRequestProcessingService
+from services.voice_processing_service import VoiceProcessingService
+
+@router.get("/experts", response_model=Dict[str, Any])
+async def get_all_experts(
+    expertise_area: Optional[str] = None,
+    availability_status: Optional[str] = None,
+    is_active: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(require_roles(["admin", "brokerage_owner"])),
+    db: Session = Depends(get_db)
+):
+    """Get all experts (admin/brokerage owner only)"""
+    try:
+        service = HumanExpertiseService(db)
+        
+        result = await service.get_all_experts(
+            expertise_area=expertise_area,
+            availability_status=availability_status,
+            is_active=is_active,
+            limit=limit,
+            offset=offset
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting all experts: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get experts: {str(e)}"
+        )
+
+@router.get("/analytics", response_model=Dict[str, Any])
+async def get_ai_assistant_analytics(
+    current_user: User = Depends(require_roles(["admin", "brokerage_owner"])),
+    db: Session = Depends(get_db)
+):
+    """Get AI assistant analytics (admin/brokerage owner only)"""
+    try:
+        if not current_user.brokerage_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User must be associated with a brokerage"
+            )
+        
+        ai_service = AIRequestProcessingService(db)
+        voice_service = VoiceProcessingService(db)
+        expert_service = HumanExpertiseService(db)
+        
+        # Get AI request analytics
+        ai_analytics = await ai_service.get_brokerage_analytics(current_user.brokerage_id)
+        
+        # Get voice processing analytics
+        voice_analytics = await voice_service.get_voice_processing_analytics(
+            brokerage_id=current_user.brokerage_id
+        )
+        
+        # Get expertise area statistics
+        expert_stats = await expert_service.get_expertise_area_statistics()
+        
+        return {
+            "ai_requests": ai_analytics,
+            "voice_processing": voice_analytics,
+            "expert_statistics": expert_stats,
+            "brokerage_id": current_user.brokerage_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting AI assistant analytics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get analytics: {str(e)}"
+        )
+
 # Router Endpoints
+
 
 @router.get("/files")
 async def get_admin_files(current_user: User = Depends(require_admin)):

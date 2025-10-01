@@ -14,9 +14,9 @@ Base = declarative_base()
 
 # Import Brokerage model to resolve relationship
 try:
-    from models.brokerage_models import Brokerage
+    from app.domain.listings.brokerage_models import Brokerage  # noqa: F401
 except ImportError:
-    # If Brokerage model is not available, define a placeholder
+    # If Brokerage model is not available, define a placeholder for type checking
     class Brokerage(Base):
         __tablename__ = "brokerages"
         id = Column(Integer, primary_key=True, index=True)

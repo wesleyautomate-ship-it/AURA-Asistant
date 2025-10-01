@@ -24,7 +24,7 @@ import uuid
 from auth.database import get_db
 from auth.middleware import get_current_user, require_roles
 from auth.models import User
-from models.ai_request_models import AIRequestNew, AIRequestStep, Deliverable, Template, AIBrandAsset, AIRequestEvent
+from app.domain.listings.ai_request_models import AIRequestNew, AIRequestStep, Deliverable, Template, AIBrandAsset, AIRequestEvent
 from services.ai_processing_service import AIProcessingService
 from services.file_storage_service import file_storage
 
@@ -172,6 +172,7 @@ async def create_ai_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create AI request: {str(e)}"
         )
+from services.voice_processing_service import VoiceProcessingService
 
 @router.post("/audio")
 async def create_audio_request(
@@ -189,55 +190,15 @@ async def create_audio_request(
                 detail="User must be associated with a brokerage"
             )
         
-        # Save audio file
-        file_info = await file_storage.save_audio_file(audio, str(uuid.uuid4()))
+        service = VoiceProcessingService(db)
         
-        # TODO: Implement audio transcription
-        # For now, use a placeholder transcript
-        transcript = "Audio transcription would go here. This is a placeholder for the actual transcript."
-        
-        # Create the request
-        ai_request = AIRequestNew(
-            user_id=current_user.id,
+        result = await service.upload_audio_file(
+            agent_id=current_user.id,
             brokerage_id=current_user.brokerage_id,
-            team=team,
-            title=transcript[:100] + "..." if len(transcript) > 100 else transcript,
-            description=transcript,
-            content=transcript,
-            content_type='audio',
-            audio_url=file_info['url'],
-            template_id=template_id,
-            status='queued',
-            eta=datetime.now() + timedelta(hours=2)
+            audio_file=audio
         )
         
-        db.add(ai_request)
-        db.flush()
-        
-        # Create initial steps
-        steps = [
-            {'step': 'queued', 'status': 'completed', 'progress': 100},
-            {'step': 'planning', 'status': 'pending', 'progress': 0},
-            {'step': 'generating', 'status': 'pending', 'progress': 0},
-            {'step': 'validating', 'status': 'pending', 'progress': 0},
-            {'step': 'draft_ready', 'status': 'pending', 'progress': 0}
-        ]
-        
-        for step_data in steps:
-            step = AIRequestStep(
-                request_id=ai_request.id,
-                step=step_data['step'],
-                status=step_data['status'],
-                progress=step_data['progress']
-            )
-            db.add(step)
-        
-        db.commit()
-        
-        # Start the AI pipeline asynchronously
-        asyncio.create_task(start_ai_processing(ai_request.id, db))
-        
-        return {"id": str(ai_request.id), "status": "created"}
+        return result
         
     except Exception as e:
         logger.error(f"Error creating audio request: {e}")

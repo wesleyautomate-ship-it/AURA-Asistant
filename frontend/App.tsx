@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import BottomNav from '@components/BottomNav';
 import CommandCenter from '@components/CommandCenter';
-import DashboardView from '@components/DashboardView';
+import DashboardView from '@components/DashboardView.mobile';
 import PropertiesScreen from '@screens/PropertiesScreen';
 import TasksView from '@components/TasksView';
 import ChatView from '@components/ChatView';
@@ -15,22 +15,85 @@ import TransactionsView from '@components/TransactionsView';
 import StrategyView from '@components/StrategyView';
 import PackagesView from '@components/PackagesView';
 
-import { View, ActionId, Task } from '@/types';
+import { View, ActionId, Task, CommandRequest } from '@/types';
 import { ACTION_ITEMS, MOCK_TASKS } from '@/constants.tsx';
+import {
+    useUIStore,
+    selectCommandCenterOpen,
+    selectCommandMode,
+    selectCommandStatus,
+    selectCommandText,
+    selectCommandTranscript,
+    selectCommandError,
+    selectSnackbars,
+} from '@/store';
 
 const App: React.FC = () => {
-    const [currentView, setCurrentView] = useState<View>('dashboard');
-    const [isCommandCenterOpen, setCommandCenterOpen] = useState(false);
-    const [selectedAction, setSelectedAction] = useState<ActionId | null>(null);
-    const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+    const [currentView, setCurrentView] = React.useState<View>('dashboard');
+    const [selectedAction, setSelectedAction] = React.useState<ActionId | null>(null);
+    const [tasks, setTasks] = React.useState<Task[]>(MOCK_TASKS);
 
-    const handleActionClick = (id: ActionId) => {
+    const commandCenterOpen = useUIStore(selectCommandCenterOpen);
+    const commandMode = useUIStore(selectCommandMode);
+    const commandStatus = useUIStore(selectCommandStatus);
+    const commandText = useUIStore(selectCommandText);
+    const commandTranscript = useUIStore(selectCommandTranscript);
+    const commandError = useUIStore(selectCommandError);
+    const snackbars = useUIStore(selectSnackbars);
+
+    const openCommandCenter = useUIStore((state) => state.openCommandCenter);
+    const closeCommandCenter = useUIStore((state) => state.closeCommandCenter);
+    const setCommandMode = useUIStore((state) => state.setCommandMode);
+    const setCommandStatus = useUIStore((state) => state.setCommandStatus);
+    const setCommandText = useUIStore((state) => state.setCommandText);
+    const setCommandTranscript = useUIStore((state) => state.setCommandTranscript);
+    const setCommandError = useUIStore((state) => state.setCommandError);
+    const resetCommandState = useUIStore((state) => state.resetCommandState);
+
+    const handleActionClick = useCallback((id: ActionId) => {
         setSelectedAction(id);
-    };
+    }, []);
 
-    const handleBackFromFeature = () => {
+    const handleBackFromFeature = useCallback(() => {
         setSelectedAction(null);
-    };
+    }, []);
+
+    const handleCommandSubmit = useCallback(
+        async (request: CommandRequest) => {
+            setCommandStatus('processing');
+            try {
+                // TODO: Integrate with workflow engine / AI coordinator
+                // For now, simulate async handling and enqueue a snackbar
+                await new Promise((resolve) => setTimeout(resolve, 1200));
+                useUIStore.getState().pushSnackbar({
+                    id: `command-${Date.now()}`,
+                    message:
+                        request.kind === 'text'
+                            ? `Command received: ${request.prompt.slice(0, 72)}${
+                                  request.prompt.length > 72 ? '…' : ''
+                              }`
+                            : `Voice command processed (${Math.round(request.duration / 1000)}s)` ,
+                });
+                resetCommandState();
+            } catch (error) {
+                console.error('Command submission failed', error);
+                setCommandError(error instanceof Error ? error.message : 'Unknown error');
+                setCommandStatus('reviewing');
+            }
+        },
+        [resetCommandState, setCommandError, setCommandStatus]
+    );
+
+    const commandContext = useMemo(
+        () => ({
+            commandMode,
+            commandStatus,
+            commandText,
+            commandTranscript,
+            commandError,
+        }),
+        [commandMode, commandStatus, commandText, commandTranscript, commandError]
+    );
 
     const renderView = () => {
         switch (currentView) {
@@ -90,9 +153,22 @@ const App: React.FC = () => {
                         <BottomNav
                             activeView={currentView}
                             onNavigate={setCurrentView}
-                            onOpenCommandCenter={() => setCommandCenterOpen(true)}
+                            onOpenCommandCenter={() => openCommandCenter()}
+                            commandMode={commandMode}
+                            commandStatus={commandStatus}
+                            isCommandCenterOpen={commandCenterOpen}
                         />
-                        {isCommandCenterOpen && <CommandCenter onClose={() => setCommandCenterOpen(false)} />}
+                        {commandCenterOpen && (
+                            <CommandCenter
+                                onClose={() => closeCommandCenter()}
+                                onModeChange={setCommandMode}
+                                onStatusChange={setCommandStatus}
+                                onTextChange={setCommandText}
+                                onTranscriptChange={setCommandTranscript}
+                                onSubmit={handleCommandSubmit}
+                                context={commandContext}
+                            />
+                        )}
                     </>
                 )}
             </div>

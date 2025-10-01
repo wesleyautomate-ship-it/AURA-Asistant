@@ -1,5 +1,5 @@
 /**
- * Audio Service for Laura AI Real Estate Assistant
+ * Audio Service for PropertyPro AI Real Estate Assistant
  * 
  * This service handles audio recording, playback, and media device management
  * for the voice command system.
@@ -217,6 +217,13 @@ class AudioService {
   }
 
   /**
+   * Get the current media stream (if recording)
+   */
+  getCurrentStream(): MediaStream | null {
+    return this.audioStream;
+  }
+
+  /**
    * Get supported MIME types
    */
   private getSupportedMimeType(preferredMimeType?: string): string {
@@ -304,5 +311,3 @@ class AudioService {
 // Export singleton instance
 export const audioService = new AudioService();
 
-// Export types
-export type { AudioDevice, RecordingOptions, AudioRecordingResult };

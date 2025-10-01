@@ -21,7 +21,7 @@ def load_env():
     
     if env_file.exists():
         load_dotenv(dotenv_path=env_file)
-        print(f"✅ Loaded environment from: {env_file}")
+
     else:
         print(f"⚠️ .env file not found at: {env_file}")
         # Fallback to current directory

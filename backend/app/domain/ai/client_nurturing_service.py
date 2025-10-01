@@ -17,7 +17,7 @@ from sqlalchemy import and_, or_, desc, func
 from fastapi import HTTPException, status
 import json
 
-from models.brokerage_models import ClientNurturing, Brokerage
+from app.domain.listings.brokerage_models import ClientNurturing, Brokerage
 from auth.models import User
 
 logger = logging.getLogger(__name__)

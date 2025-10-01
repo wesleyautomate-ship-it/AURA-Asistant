@@ -21,12 +21,12 @@ from sqlalchemy import and_, or_, desc, func, text
 from fastapi import HTTPException, status
 import json
 
-from models.phase3_advanced_models import (
+from app.domain.listings.phase3_advanced_models import (
     SystemPerformanceMetric, UserActivityAnalytic, AIProcessingAnalytic,
     MultiBrokerageAnalytic, DeveloperPanelSetting, SystemAlert
 )
-from models.ai_assistant_models import AIRequest, HumanExpert, VoiceRequest
-from models.brokerage_models import Brokerage
+from app.domain.listings.ai_assistant_models import AIRequest, HumanExpert, VoiceRequest
+from app.domain.listings.brokerage_models import Brokerage
 from auth.models import User
 
 logger = logging.getLogger(__name__)

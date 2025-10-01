@@ -14,7 +14,12 @@ from datetime import datetime, timedelta
 import google.generativeai as genai
 from sqlalchemy.orm import Session
 
-from models.ai_request_models import AIRequest, AIRequestStep, Deliverable, Template
+from app.domain.listings.ai_request_models import (
+    AIRequestNew as AIRequest,
+    AIRequestStep,
+    Deliverable,
+    Template,
+)
 from auth.database import get_db
 
 logger = logging.getLogger(__name__)

@@ -20,7 +20,7 @@ from fastapi import HTTPException, status, UploadFile
 import json
 import uuid
 
-from models.brokerage_models import BrandAsset, Brokerage
+from app.domain.listings.brokerage_models import BrandAsset, Brokerage
 from auth.models import User
 
 logger = logging.getLogger(__name__)

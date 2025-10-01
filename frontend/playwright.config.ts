@@ -1,4 +1,9 @@
-import { defineConfig } from '@playwright/test';
+﻿import { defineConfig } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export default defineConfig({
   testDir: './tests',
@@ -10,7 +15,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    viewport: { width: 390, height: 844 }, // Mobile-first (iPhone 12-ish)
+    viewport: { width: 390, height: 844 },
   },
   webServer: {
     command: 'npm run dev -- --host 0.0.0.0 --port 3000',
