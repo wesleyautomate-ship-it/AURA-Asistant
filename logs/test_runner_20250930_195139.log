@@ -1,0 +1,330 @@
+2025-09-30 19:51:39,255 - __main__ - INFO - Running all tests: ['unit']
+2025-09-30 19:51:39,255 - __main__ - INFO - Setting up test environment...
+2025-09-30 19:51:39,256 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m pip install -r C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\tests\requirements-test.txt
+2025-09-30 19:51:41,386 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe scripts/create_test_db.py
+2025-09-30 19:51:42,041 - __main__ - INFO - Test environment setup completed
+2025-09-30 19:51:42,041 - __main__ - INFO - Running code quality checks...
+2025-09-30 19:51:42,041 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m black --check backend tests
+2025-09-30 19:51:42,147 - __main__ - ERROR - Command failed with exit code 1
+2025-09-30 19:51:42,147 - __main__ - ERROR - Stdout: 
+2025-09-30 19:51:42,148 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe: No module named black
+
+2025-09-30 19:51:42,148 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m flake8 backend tests
+2025-09-30 19:51:42,278 - __main__ - ERROR - Command failed with exit code 1
+2025-09-30 19:51:42,278 - __main__ - ERROR - Stdout: 
+2025-09-30 19:51:42,278 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe: No module named flake8
+
+2025-09-30 19:51:42,278 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m mypy backend
+2025-09-30 19:51:42,393 - __main__ - ERROR - Command failed with exit code 1
+2025-09-30 19:51:42,393 - __main__ - ERROR - Stdout: 
+2025-09-30 19:51:42,393 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe: No module named mypy
+
+2025-09-30 19:51:42,393 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m bandit -r backend
+2025-09-30 19:51:42,513 - __main__ - ERROR - Command failed with exit code 1
+2025-09-30 19:51:42,513 - __main__ - ERROR - Stdout: 
+2025-09-30 19:51:42,513 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe: No module named bandit
+
+2025-09-30 19:51:42,513 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m safety check
+2025-09-30 19:51:42,630 - __main__ - ERROR - Command failed with exit code 1
+2025-09-30 19:51:42,630 - __main__ - ERROR - Stdout: 
+2025-09-30 19:51:42,630 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe: No module named safety
+
+2025-09-30 19:51:42,631 - __main__ - INFO - Running unit tests...
+2025-09-30 19:51:42,631 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m pytest tests/unit -v --tb=short --strict-markers --html=C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_report.html --self-contained-html --junitxml=C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_junit.xml --cov=backend --cov-report=html:C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_coverage --cov-report=xml:C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_coverage.xml --cov-report=term-missing
+2025-09-30 19:52:10,694 - __main__ - ERROR - Command failed with exit code 2
+2025-09-30 19:52:10,695 - __main__ - ERROR - Stdout: ============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-7.4.3, pluggy-1.6.0 -- C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+metadata: {'Python': '3.13.7', 'Platform': 'Windows-11-10.0.26100-SP0', 'Packages': {'pytest': '7.4.3', 'pluggy': '1.6.0'}, 'Plugins': {'anyio': '3.7.1', 'asyncio': '0.21.1', 'cov': '4.1.0', 'html': '4.1.1', 'metadata': '3.1.1', 'mock': '3.12.0', 'timeout': '2.1.0', 'xdist': '3.3.1'}}
+rootdir: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant
+configfile: pytest.ini
+plugins: anyio-3.7.1, asyncio-0.21.1, cov-4.1.0, html-4.1.1, metadata-3.1.1, mock-3.12.0, timeout-2.1.0, xdist-3.3.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 0 items / 3 errors
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/unit/test_auth_models.py _______________
+ImportError while importing test module 'C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\tests\unit\test_auth_models.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\unit\test_auth_models.py:15: in <module>
+    from auth.utils import hash_password
+backend\auth\utils.py:5: in <module>
+    import bcrypt
+E   ModuleNotFoundError: No module named 'bcrypt'
+_______________ ERROR collecting tests/unit/test_auth_utils.py ________________
+ImportError while importing test module 'C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\tests\unit\test_auth_utils.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2032.0_x64__qbz5n2kfra8p0\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\unit\test_auth_utils.py:5: in <module>
+    import jwt
+E   ModuleNotFoundError: No module named 'jwt'
+__________________ ERROR collecting tests/unit/test_basic.py __________________
+'performance' not found in `markers` configuration option
+============================== warnings summary ===============================
+.venv\Lib\site-packages\sqlalchemy\sql\sqltypes.py:2061
+  C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Lib\site-packages\sqlalchemy\sql\sqltypes.py:2061: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    epoch = dt.datetime.utcfromtimestamp(0)
+
+backend\app\core\models.py:13
+  C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\backend\app\core\models.py:13: MovedIn20Warning: Deprecated API features detected! These feature(s) are not compatible with SQLAlchemy 2.0. To prevent incompatible upgrades prior to updating applications, ensure requirements files are pinned to "sqlalchemy<2.0". Set environment variable SQLALCHEMY_WARN_20=1 to show all deprecation warnings.  Set environment variable SQLALCHEMY_SILENCE_UBER_WARNING=1 to silence this message. (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+.venv\Lib\site-packages\_pytest\config\__init__.py:1373
+  C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Lib\site-packages\_pytest\config\__init__.py:1373: PytestConfigWarning: Unknown config option: python_paths
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports\unit_junit.xml -
+
+---------- coverage: platform win32, python 3.13.7-final-0 -----------
+Name                                                                Stmts   Miss  Cover   Missing
+-------------------------------------------------------------------------------------------------
+backend\action_engine.py                                              265    265     0%   7-736
+backend\admin_dashboard.py                                            126    126     0%   6-236
+backend\admin_router.py                                               132    132     0%   9-255
+backend\ai_enhancements.py                                             76     76     0%   16-143
+backend\ai_manager.py                                                 602    602     0%   13-1860
+backend\ai_provider.py                                                 40     40     0%   18-88
+backend\app\__init__.py                                                 0      0   100%
+backend\app\api\__init__.py                                             0      0   100%
+backend\app\api\v1\__init__.py                                          0      0   100%
+backend\app\api\v1\admin_knowledge_router.py                          156    156     0%   8-346
+backend\app\api\v1\admin_router.py                                    159    159     0%   9-334
+backend\app\api\v1\ai_assistant_router.py                             201    201     0%   12-533
+backend\app\api\v1\ai_request_router.py                               252    252     0%   13-678
+backend\app\api\v1\analytics_router.py                                286    286     0%   17-1081
+backend\app\api\v1\auth_router.py                                      90     90     0%   1-220
+backend\app\api\v1\chat_sessions_router.py                            607    607     0%   9-1562
+backend\app\api\v1\clients_router.py                                   96     96     0%   9-170
+backend\app\api\v1\cma_reports_router.py                              236    236     0%   16-832
+backend\app\api\v1\data_router.py                                     115    115     0%   9-253
+backend\app\api\v1\database_enhancement_router.py                     215    215     0%   7-535
+backend\app\api\v1\documents_router.py                                 83     83     0%   7-217
+backend\app\api\v1\feedback_router.py                                  58     58     0%   9-113
+backend\app\api\v1\file_processing_router.py                          205    205     0%   9-432
+backend\app\api\v1\health_router.py                                     8      8     0%   1-10
+backend\app\api\v1\human_expertise_router.py                           68     68     0%   12-186
+backend\app\api\v1\marketing_automation_router.py                     252    252     0%   16-849
+backend\app\api\v1\ml_advanced_router.py                              157    157     0%   7-347
+backend\app\api\v1\ml_insights_router.py                              408    408     0%   12-970
+backend\app\api\v1\ml_websocket_router.py                             191    191     0%   8-402
+backend\app\api\v1\nurturing_router.py                                153    153     0%   7-476
+backend\app\api\v1\performance_router.py                              161    161     0%   9-289
+backend\app\api\v1\phase3_advanced_router.py                          176    176     0%   12-491
+backend\app\api\v1\property_detection_router.py                       130    130     0%   7-273
+backend\app\api\v1\property_management.py                             272    272     0%   1-467
+backend\app\api\v1\report_generation_router.py                        181    181     0%   14-740
+backend\app\api\v1\search_optimization_router.py                      170    170     0%   7-386
+backend\app\api\v1\social_media_router.py                             247    247     0%   16-829
+backend\app\api\v1\task_orchestration_router.py                       173    173     0%   16-591
+backend\app\api\v1\team_management_router.py                          187    187     0%   9-452
+backend\app\api\v1\transactions_router.py                             135    135     0%   9-240
+backend\app\api\v1\workflows_router.py                                174    174     0%   18-601
+backend\app\core\__init__.py                                            1      0   100%
+backend\app\core\database.py                                           91     91     0%   5-204
+backend\app\core\dev_auth_bypass.py                                    64     64     0%   15-207
+backend\app\core\env_loader.py                                         15     15     0%   7-31
+backend\app\core\middleware.py                                        141    141     0%   5-398
+backend\app\core\models.py                                            122     14    89%   85, 89, 93-95, 116, 120, 137, 155, 159-162, 179
+backend\app\core\rate_limiter.py                                       91     91     0%   5-232
+backend\app\core\role_based_access.py                                 109    109     0%   9-279
+backend\app\core\routes.py                                            296    296     0%   5-842
+backend\app\core\session_manager.py                                   200    200     0%   9-382
+backend\app\core\settings.py                                           79     79     0%   6-152
+backend\app\core\simple_dev_auth.py                                    30     30     0%   10-91
+backend\app\core\token_manager.py                                     194    194     0%   8-349
+backend\app\core\utils.py                                             110    110     0%   5-294
+backend\app\domain\__init__.py                                          0      0   100%
+backend\app\domain\ai\__init__.py                                       0      0   100%
+backend\app\domain\ai\action_engine.py                                162    162     0%   7-420
+backend\app\domain\ai\advanced_ml_service.py                          351    351     0%   6-808
+backend\app\domain\ai\ai_enhancements.py                               76     76     0%   16-143
+backend\app\domain\ai\ai_manager.py                                   550    550     0%   13-1649
+backend\app\domain\ai\ai_processing_service.py                        364    364     0%   9-1029
+backend\app\domain\ai\ai_request_processing_service.py                236    236     0%   12-668
+backend\app\domain\ai\analytics_service.py                            330    330     0%   12-741
+backend\app\domain\ai\brand_management_service.py                     226    226     0%   12-527
+backend\app\domain\ai\brokerage_management_service.py                 209    209     0%   13-462
+backend\app\domain\ai\client_nurturing_service.py                     194    194     0%   12-486
+backend\app\domain\ai\compliance_monitoring_service.py                208    208     0%   12-524
+backend\app\domain\ai\developer_panel_service.py                      261    261     0%   14-731
+backend\app\domain\ai\document_processing_service.py                  261    261     0%   8-525
+backend\app\domain\ai\dubai_data_integration_service.py               180    180     0%   12-621
+backend\app\domain\ai\entity_detection_service.py                      95     95     0%   8-276
+backend\app\domain\ai\file_storage_service.py                         122    122     0%   9-229
+backend\app\domain\ai\human_expertise_service.py                      188    188     0%   12-608
+backend\app\domain\ai\hybrid_search_engine.py                         193    193     0%   7-400
+backend\app\domain\ai\intelligent_data_sorter.py                      291    291     0%   8-786
+backend\app\domain\ai\intelligent_processor.py                        230    230     0%   7-491
+backend\app\domain\ai\knowledge_base_service.py                       180    180     0%   12-506
+backend\app\domain\ai\notification_service.py                         257    257     0%   12-596
+backend\app\domain\ai\package_manager.py                              148    148     0%   15-509
+backend\app\domain\ai\property_detection_service.py                   229    229     0%   8-474
+backend\app\domain\ai\query_understanding.py                          146    146     0%   14-304
+backend\app\domain\ai\rag_service.py                                  448    448     0%   7-1340
+backend\app\domain\ai\reporting_service.py                            217    217     0%   12-555
+backend\app\domain\ai\response_enhancer.py                            118    118     0%   13-280
+backend\app\domain\ai\task_orchestrator.py                            238    238     0%   16-573
+backend\app\domain\ai\workflow_automation_service.py                  204    204     0%   12-465
+backend\app\domain\feedback\__init__.py                                 0      0   100%
+backend\app\domain\feedback\data_quality_checker.py                   231    231     0%   7-433
+backend\app\domain\listings\__init__.py                                 3      0   100%
+backend\app\domain\listings\ai_assistant_models.py                    295    295     0%   14-397
+backend\app\domain\listings\ai_request_models.py                      100    100     0%   13-183
+backend\app\domain\listings\brokerage_models.py                       259     59    77%   77, 82-85, 90, 111, 116-119, 141, 160, 165-168, 192, 197-200, 205-208, 230, 235-238, 243-246, 269, 274-277, 282-285, 305, 310-313, 334, 339-342, 364, 369-372
+backend\app\domain\listings\enhanced_real_estate_models.py            342    342     0%   13-454
+backend\app\domain\listings\ml_database_models.py                     104    104     0%   8-493
+backend\app\domain\listings\phase3_advanced_models.py                 266    266     0%   16-363
+backend\app\domain\sessions\__init__.py                                 0      0   100%
+backend\app\domain\sessions\context_management_service.py             168    168     0%   7-413
+backend\app\domain\sessions\secure_sessions.py                         89     89     0%   8-269
+backend\app\domain\sessions\websocket_manager.py                      195    195     0%   8-420
+backend\app\infrastructure\__init__.py                                  0      0   100%
+backend\app\infrastructure\cache\__init__.py                            0      0   100%
+backend\app\infrastructure\cache\cache_manager.py                     250    250     0%   7-431
+backend\app\infrastructure\db\__init__.py                               0      0   100%
+backend\app\infrastructure\db\database_enhancement_optimizer.py       201    201     0%   7-516
+backend\app\infrastructure\db\database_index_optimizer.py             183    183     0%   7-585
+backend\app\infrastructure\db\database_manager.py                      67     67     0%   8-145
+backend\app\infrastructure\db\database_migrations.py                   83     83     0%   7-301
+backend\app\infrastructure\db\init_database.py                         95     95     0%   5-338
+backend\app\infrastructure\db\migrations\__init__.py                    0      0   100%
+backend\app\infrastructure\db\migrations\data_migration_script.py     186    186     0%   7-548
+backend\app\infrastructure\db\seed_properties.py                       16     16     0%   8-73
+backend\app\infrastructure\integrations\__init__.py                     0      0   100%
+backend\app\infrastructure\integrations\populate_chromadb.py           90     90     0%   7-302
+backend\app\infrastructure\integrations\populate_postgresql.py        129    129     0%   7-960
+backend\app\infrastructure\integrations\rag_monitoring.py             200    200     0%   6-571
+backend\app\infrastructure\queue\__init__.py                            2      2     0%   7-8
+backend\app\infrastructure\queue\ai_commands.py                        57     57     0%   7-213
+backend\app\infrastructure\queue\async_processing.py                   44     44     0%   7-105
+backend\app\infrastructure\queue\batch_processor.py                   194    194     0%   7-325
+backend\app\infrastructure\queue\celery_app.py                         20     20     0%   7-47
+backend\app\infrastructure\queue\celeryconfig.py                       27     27     0%   11-82
+backend\app\infrastructure\queue\nurturing_scheduler.py               124    124     0%   7-332
+backend\app\infrastructure\queue\scheduler.py                         104    104     0%   7-212
+backend\app\infrastructure\queue\task_manager.py                       92     92     0%   7-155
+backend\app\main.py                                                   383    383     0%   19-549
+backend\app\schemas\__init__.py                                         0      0   100%
+backend\app\tests\__init__.py                                           0      0   100%
+backend\app\tests\test_advanced_chat.py                                63     63     0%   6-112
+backend\app\tests\test_auth.py                                         78     78     0%   1-146
+backend\app\tests\test_blueprint_2.py                                 148    148     0%   7-282
+backend\app\tests\test_content_generation.py                           65     65     0%   9-190
+backend\async_processing.py                                            44     44     0%   7-105
+backend\auth\__init__.py                                                1      0   100%
+backend\auth\database.py                                               91     73    20%   33-51, 58-67, 73-85, 91-184, 190-196
+backend\auth\dev_auth_bypass.py                                        64     64     0%   15-207
+backend\auth\middleware.py                                            120    120     0%   5-339
+backend\auth\models.py                                                127     20    84%   18-24, 88, 92, 96-98, 120, 124, 142, 161, 165-168, 186
+backend\auth\rate_limiter.py                                           91     91     0%   5-232
+backend\auth\routes.py                                                296    296     0%   5-842
+backend\auth\simple_dev_auth.py                                        30     30     0%   10-91
+backend\auth\token_manager.py                                         194    194     0%   8-349
+backend\auth\utils.py                                                 110    109     1%   6-294
+backend\batch_processor.py                                            194    194     0%   7-325
+backend\cache_manager.py                                              250    250     0%   7-431
+backend\celery_app.py                                                  20     20     0%   7-47
+backend\celeryconfig.py                                                27     27     0%   11-82
+backend\chat_report_integration.py                                    285    285     0%   8-693
+backend\chat_sessions_router.py                                       609    609     0%   9-1563
+backend\check_users.py                                                 18     18     0%   6-27
+backend\config\settings.py                                             79     34    57%   45, 50, 102-127, 131, 136-149
+backend\context_management_service.py                                 168    168     0%   7-413
+backend\create_admin_user.py                                           33     33     0%   6-82
+backend\create_default_users.py                                        44     44     0%   6-142
+backend\data_quality_checker.py                                       231    231     0%   7-433
+backend\data_router.py                                                115    115     0%   9-253
+backend\database_enhancement_optimizer.py                             201    201     0%   7-516
+backend\database_enhancement_router.py                                215    215     0%   7-535
+backend\database_index_optimizer.py                                   183    183     0%   7-585
+backend\database_manager.py                                            67     67     0%   8-145
+backend\database_migrations.py                                         83     83     0%   7-301
+backend\database_schema_analysis.py                                   174    174     0%   7-349
+backend\demo_phase3.py                                                103    103     0%   10-160
+backend\document_generator.py                                         107    107     0%   7-400
+backend\documents_router.py                                            83     83     0%   7-217
+backend\entity_detection_service.py                                    95     95     0%   8-276
+backend\env_loader.py                                                  14      4    71%   15-16, 26-28
+backend\feedback_router.py                                             58     58     0%   9-113
+backend\file_processing_router.py                                     205    205     0%   9-432
+backend\fix_auth.py                                                    31     31     0%   6-74
+backend\fix_conversations_schema.py                                    32     32     0%   9-79
+backend\fix_conversations_schema_docker.py                             33     33     0%   9-82
+backend\hybrid_search_engine.py                                       193    193     0%   7-400
+backend\import_data_inside_container.py                               113    113     0%   7-233
+backend\init_database.py                                               93     93     0%   5-336
+backend\intelligent_processor.py                                      230    230     0%   7-491
+backend\mcp_config.py                                                  36     36     0%   8-145
+backend\ml\__init__.py                                                 32     32     0%   16-98
+backend\ml\advanced_ml_models.py                                      358    358     0%   12-845
+backend\ml_advanced_router.py                                         157    157     0%   7-347
+backend\ml_database_models.py                                         102    102     0%   8-491
+backend\ml_insights_router.py                                         408    408     0%   12-970
+backend\ml_websocket_router.py                                        191    191     0%   8-402
+backend\models_legacy\__init__.py                                       3      3     0%   5-10
+backend\models_legacy\ai_request_models.py                            100    100     0%   13-183
+backend\models_legacy\enhanced_real_estate_models.py                  309    309     0%   13-407
+backend\models_legacy\phase3_advanced_models.py                       266    266     0%   16-363
+backend\monitoring\__init__.py                                          0      0   100%
+backend\monitoring\application_metrics.py                              36     36     0%   6-83
+backend\nurturing_router.py                                           153    153     0%   7-476
+backend\nurturing_scheduler.py                                        124    124     0%   7-332
+backend\performance_monitor.py                                        213    213     0%   7-457
+backend\performance_router.py                                         161    161     0%   9-289
+backend\phase1_migration.py                                            77     77     0%   7-248
+backend\phase3_migrations.py                                          127    127     0%   9-364
+backend\populate_chromadb.py                                           90     90     0%   7-302
+backend\populate_postgresql.py                                        129    129     0%   7-960
+backend\property_management.py                                        391    391     0%   1-846
+backend\query_understanding.py                                        146    146     0%   14-304
+backend\rag_monitoring.py                                             200    200     0%   6-571
+backend\rag_service.py                                                448    448     0%   7-1340
+backend\report_generation_router.py                                   181    181     0%   14-740
+backend\response_enhancer.py                                          118    118     0%   13-280
+backend\run_voice_migration.py                                         44     44     0%   7-71
+backend\run_voice_migration_sqlite.py                                  51     51     0%   7-250
+backend\scheduler.py                                                  104    104     0%   7-212
+backend\search_optimization_router.py                                 170    170     0%   7-386
+backend\secure_sessions.py                                             89     89     0%   8-269
+backend\session_chat_fix.py                                            85     85     0%   9-234
+backend\task_manager.py                                               253    253     0%   7-498
+backend\tasks\__init__.py                                               2      2     0%   7-8
+backend\tasks\ai_commands.py                                           57     57     0%   7-213
+backend\tasks\data_processing.py                                       30     30     0%   5-73
+backend\tasks\ml_training.py                                           21     21     0%   5-54
+backend\tasks\reports.py                                               21     21     0%   5-53
+backend\test_advanced_chat.py                                          63     63     0%   6-112
+backend\test_blueprint_2.py                                           148    148     0%   7-282
+backend\test_content_generation.py                                     65     65     0%   9-190
+backend\test_mcp_integration.py                                       104    104     0%   9-159
+backend\test_simple_routers.py                                        104    104     0%   10-159
+backend\test_voice_database.py                                         55     55     0%   7-108
+backend\verify_data_integrity.py                                      101    101     0%   10-270
+backend\voice_mcp_config.py                                            36     36     0%   8-142
+backend\websocket_manager.py                                          195    195     0%   8-420
+-------------------------------------------------------------------------------------------------
+TOTAL                                                               32559  32065     2%
+Coverage HTML written to dir C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_coverage
+Coverage XML written to file C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports/unit_coverage.xml
+
+- Generated html report: file:///C:/Users/wesle/OneDrive/Documents/RealtorPro%20AI/Realtor-assistant/test_reports/unit_report.html -
+=========================== short test summary info ===========================
+ERROR tests/unit/test_auth_models.py
+ERROR tests/unit/test_auth_utils.py
+ERROR tests/unit/test_basic.py - Failed: 'performance' not found in `markers`...
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!
+======================= 3 warnings, 3 errors in 26.11s ========================
+
+2025-09-30 19:52:10,696 - __main__ - ERROR - Stderr: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Lib\site-packages\coverage\report_core.py:107: CoverageWarning: Couldn't parse Python file 'C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\backend\app\domain\ai\voice_processing_service.py' (couldnt-parse); see https://coverage.readthedocs.io/en/7.10.7/messages.html#warning-couldnt-parse
+  coverage._warn(msg, slug="couldnt-parse")
+
+2025-09-30 19:52:10,699 - __main__ - INFO - Test report generated: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\test_reports\test_report_20250930_195210.json
+2025-09-30 19:52:10,699 - __main__ - INFO - Cleaning up test environment...
+2025-09-30 19:52:10,700 - __main__ - INFO - Test environment cleanup completed

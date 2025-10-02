@@ -1,0 +1,5 @@
+2025-09-30 19:38:42,013 - __main__ - INFO - Running all tests: ['unit']
+2025-09-30 19:38:42,013 - __main__ - INFO - Setting up test environment...
+2025-09-30 19:38:42,014 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -m pip install -r C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\tests\requirements-test.txt
+2025-09-30 19:38:45,127 - __main__ - INFO - Running command: C:\Users\wesle\OneDrive\Documents\RealtorPro AI\Realtor-assistant\.venv\Scripts\python.exe -c from tests.conftest import test_engine; from auth.database import Base; Base.metadata.create_all(bind=test_engine)
+2025-09-30 19:38:46,162 - __main__ - ERROR - Failed to setup test database
