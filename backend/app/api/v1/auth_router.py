@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import logging
+import json
 
 from app.core.database import get_db
 from app.core.utils import hash_password, verify_password, generate_access_token, generate_refresh_token, verify_jwt_token, generate_session_token
@@ -73,7 +74,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
                 VALUES (:user_id, 'login_failed', :event_data, false, 'Invalid password', CURRENT_TIMESTAMP)
             """), {
                 "user_id": user_data.id,
-                "event_data": {"email": request.email, "reason": "invalid_password"}
+                "event_data": json.dumps({"email": request.email, "reason": "invalid_password"})
             })
             db.commit()
             
@@ -105,7 +106,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             VALUES (:user_id, 'login_success', :event_data, true, CURRENT_TIMESTAMP)
         """), {
             "user_id": user_data.id,
-            "event_data": {"email": request.email}
+            "event_data": json.dumps({"email": request.email})
         })
         
         db.commit()
@@ -200,7 +201,7 @@ async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
             VALUES (:user_id, 'token_refresh', :event_data, true, CURRENT_TIMESTAMP)
         """), {
             "user_id": user_id,
-            "event_data": {"session_id": session_data.id}
+            "event_data": json.dumps({"session_id": session_data.id})
         })
         
         db.commit()

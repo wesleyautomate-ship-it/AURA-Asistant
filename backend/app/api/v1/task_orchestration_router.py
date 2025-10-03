@@ -1,4 +1,4 @@
-﻿"""
+"""
 Task Orchestration Router
 =========================
 
@@ -97,7 +97,7 @@ class CustomPackageRequest(BaseModel):
     """Request model for creating custom packages"""
     name: str = Field(..., min_length=3, max_length=255)
     description: str = Field(..., min_length=10, max_length=1000)
-    category: str = Field(..., regex="^(listing|nurturing|onboarding|custom)$")
+    category: str = Field(..., pattern="^(listing|nurturing|onboarding|custom)$")
     steps: List[Dict[str, Any]]
 
 
@@ -528,9 +528,8 @@ async def quick_lead_nurturing(
 # =============================================================================
 
 @router.get("/stats")
-@require_roles(["admin", "brokerage_owner"])
 async def get_orchestration_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(["admin", "brokerage_owner"])),
     db: Session = Depends(get_db)
 ):
     """

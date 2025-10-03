@@ -389,21 +389,6 @@ AND table_name IN ('market_data', 'neighborhood_profiles', 'transactions', 'prop
 -- MIGRATION COMPLETION
 -- ============================================================
 
--- Log migration completion
-INSERT INTO ml_insights_log (
-    insight_type,
-    insight_data,
-    confidence_score,
-    model_used,
-    created_at
-) VALUES (
-    'schema_enhancement',
-    '{"migration_type": "schema_enhancement", "tables_enhanced": ["properties", "leads", "clients"], "new_tables_created": ["market_data", "neighborhood_profiles", "transactions", "property_viewings", "appointments", "rera_compliance", "document_management"], "indexes_created": "comprehensive_performance_indexes", "impact": "high"}',
-    0.95,
-    'schema_enhancer',
-    CURRENT_TIMESTAMP
-);
-
 -- Update statistics
 ANALYZE;
 

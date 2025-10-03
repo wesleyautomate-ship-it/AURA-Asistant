@@ -1,0 +1,13 @@
+{
+  "name": "@propertypro/services",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@propertypro/store": "file:../store",
+    "@propertypro/features": "file:../features",
+    "expo-constants": "^18.0.9"
+  }
+}

@@ -1,4 +1,6 @@
-# Phase 01 — Foundation
+﻿# Phase 01 — Foundation (Historical Reference)
+
+> Archived note: The milestones below capture the original foundation plan. The current state and guidance live in `docs/PROPERTYPRO_AI_ROADMAP.md` and `docs/handbook/backend.md`.
 
 Scope: Establish secure, scalable fundamentals to support subsequent feature work.
 
@@ -22,9 +24,9 @@ Scope: Establish secure, scalable fundamentals to support subsequent feature wor
 - `Permission(id, name, resource, action)`
 
 ## APIs
-- `POST /api/v1/auth/login` → access + refresh
-- `POST /api/v1/auth/refresh` → new access
-- `GET /api/v1/health` → liveness/readiness
+- `POST /api/v1/auth/login` â†’ access + refresh
+- `POST /api/v1/auth/refresh` â†’ new access
+- `GET /api/v1/health` â†’ liveness/readiness
 
 ## Non-Functional
 - Rate limiting defaults.
@@ -72,7 +74,7 @@ Scope: Establish secure, scalable fundamentals to support subsequent feature wor
 ### 4) Data Model (Phase 01)
 - `User(id, email, password_hash, first_name, last_name, role, is_active, email_verified, created_at, updated_at)`
 - `UserSession(id, user_id, session_token, refresh_token, ip_address, user_agent, expires_at, is_active, created_at, last_used)`
-- `Role(id, name, description, is_default, created_at, updated_at)` ↔ `Permission(id, name, resource, action, description, created_at)` (M:N)
+- `Role(id, name, description, is_default, created_at, updated_at)` â†” `Permission(id, name, resource, action, description, created_at)` (M:N)
 - Optional: `AuditLog(id, user_id, event_type, event_data, ip_address, user_agent, success, error_message, created_at)`
 
 ### 5) API Surface (Phase 01)
@@ -150,10 +152,10 @@ Health
 ### 9) Acceptance Tests (Phase 01)
 - Auth
   - Successful login returns access+refresh and user profile.
-  - Invalid password → 401 with standard error envelope.
-  - Inactive user → 403.
+  - Invalid password â†’ 401 with standard error envelope.
+  - Inactive user â†’ 403.
   - Refresh with valid refresh token returns new access token.
-  - Refresh with invalid/expired token → 401.
+  - Refresh with invalid/expired token â†’ 401.
 - Health
   - `/api/v1/health` returns `status=ok` when DB reachable.
   - Returns `status=degraded` if DB ping fails (optional readiness logic).

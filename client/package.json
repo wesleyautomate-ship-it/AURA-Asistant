@@ -1,0 +1,18 @@
+{
+    "name":  "propertypro-client",
+    "private":  true,
+    "version":  "0.1.0",
+    "workspaces":  [
+                       "apps/*",
+                       "packages/*"
+                   ],
+    "scripts":  {
+                    "dev:web":  "npm run dev --workspace @propertypro/web",
+                    "build:web":  "npm run build --workspace @propertypro/web",
+                    "test:web":  "npm run test:e2e --workspace @propertypro/web",
+                    "dev:mobile":  "npm run start --workspace @propertypro/mobile",
+                    "lint:mobile":  "npm run lint --workspace @propertypro/mobile",
+                    "typecheck:web":  "npm run typecheck --workspace @propertypro/web",
+                    "lint:web":  "npm run lint --workspace @propertypro/web"
+                }
+}

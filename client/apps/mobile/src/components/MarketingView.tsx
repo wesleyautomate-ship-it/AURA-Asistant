@@ -1,0 +1,1 @@
+export { MarketingView as default } from '@propertypro/features';

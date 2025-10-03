@@ -10,6 +10,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data_staging:/var/lib/postgresql/data
+      - ./backend/app/infrastructure/db/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - rag-network-staging
     healthcheck:
@@ -67,16 +68,15 @@ services:
 
   # React Frontend
   frontend-staging:
-    build: ./frontend
+    build:
+      context: ./client/apps/web
+      dockerfile: ../../Dockerfile.web-smoke
     ports:
-      - "3001:3000"
+      - "3001:80"
     environment:
-      - REACT_APP_API_URL=http://localhost:8004
+      - REACT_APP_API_URL=http://backend-staging:8001
     depends_on:
       - backend-staging
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - rag-network-staging
     restart: unless-stopped

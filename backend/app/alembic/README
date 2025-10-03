@@ -1,1 +1,35 @@
-Generic single-database configuration.
+﻿Alembic Migration Workflow
+==========================
+
+This repository already contains an Alembic environment under `backend/app/alembic`. Use the following workflow to manage database schema changes going forward.
+
+1. **Configure environment**
+   - Ensure `DATABASE_URL` points to a development database.
+   - Run `pip install -r requirements.txt` if Alembic dependencies are missing.
+
+2. **Create a revision**
+   - From `backend/app`, run: `alembic revision -m "describe change" --autogenerate`.
+   - Review the generated file in `alembic/versions/` to verify tables, columns, and constraints are correct.
+
+3. **Apply the migration locally**
+   - Execute `alembic upgrade head` against your development database.
+   - Run smoke tests or targeted queries to validate the schema change.
+
+4. **Check in migration files**
+   - Commit the updated revision file(s) and any related schema updates.
+   - Update documentation (e.g., `docs/handbook/backend.md` Data & Persistence section) if the change is significant.
+
+5. **Pull request checklist**
+   - Confirm a migration exists for every schema change.
+   - Mention the migration identifier in the PR description.
+   - Link to verification evidence (test results, screenshots).
+
+6. **Deployment**
+   - Database migrations should run before the application is deployed. In Docker Compose environments, add a job or manual step to execute `alembic upgrade head`.
+
+7. **Troubleshooting**
+   - To downgrade locally: `alembic downgrade -1`.
+   - To view history: `alembic history --verbose`.
+   - For SQL preview without applying: `alembic upgrade head --sql`.
+
+Maintain this process to prevent schema drift between environments.
