@@ -14,10 +14,11 @@ import PlaywrightTestView from '@components/PlaywrightTestView';
 import TransactionsView from '@components/TransactionsView';
 import StrategyView from '@components/StrategyView';
 import PackagesView from '@components/PackagesView';
+import RequestsView from '@components/RequestsView';
 import LoginView from '@components/LoginView';
 
-import { View, ActionId, Task, CommandRequest } from '@/types';
-import { ACTION_ITEMS, MOCK_TASKS } from '@/constants.tsx';
+import { View, ActionId, CommandRequest } from '@/types';
+import { ACTION_ITEMS } from '@/constants.tsx';
 import {
     useUIStore,
     selectCommandCenterOpen,
@@ -34,12 +35,22 @@ import {
     selectClientFetchStatus,
 } from '@/store';
 
+// Development mock user for bypassing authentication
+const DEV_MOCK_USER = {
+    id: 'dev-user-001',
+    name: 'Development User',
+    email: 'dev@local',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+};
+
 const App: React.FC = () => {
     const [currentView, setCurrentView] = React.useState<View>('dashboard');
     const [selectedAction, setSelectedAction] = React.useState<ActionId | null>(null);
-    const [tasks, setTasks] = React.useState<Task[]>(MOCK_TASKS);
 
     const authToken = useUserStore(selectAuthToken);
+    const login = useUserStore((state) => state.login);
 
     const propertyFetchStatus = usePropertyStore(selectPropertyFetchStatus);
     const clientFetchStatus = useClientStore(selectClientFetchStatus);
@@ -64,6 +75,22 @@ const App: React.FC = () => {
 
     const isAuthenticated = Boolean(authToken);
 
+    // Development authentication bypass
+    useEffect(() => {
+        if (import.meta.env?.DEV && !authToken) {
+            // Auto-authenticate with mock user in development
+            login({
+                user: DEV_MOCK_USER,
+                accessToken: 'dev-mock-token',
+                refreshToken: 'dev-mock-refresh-token',
+                expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+            });
+            
+            // Clear any stale tokens from previous sessions
+            localStorage.removeItem('token');
+        }
+    }, [login, authToken]);
+
     useEffect(() => {
         if (!isAuthenticated) {
             return;
@@ -87,22 +114,52 @@ const App: React.FC = () => {
     const handleCommandSubmit = useCallback(
         async (request: CommandRequest) => {
             setCommandStatus('processing');
+            
             try {
-                await new Promise((resolve) => setTimeout(resolve, 1200));
+                // Import the store dynamically to avoid circular dependency issues
+                const { useAIRequestStore } = await import('@/store');
+                const createFromCommand = useAIRequestStore.getState().createFromCommand;
+                
+                // Extract content based on request type
+                const content = request.kind === 'text' 
+                    ? request.prompt 
+                    : request.transcript;
+                
+                // Determine team/category from content or use default
+                let team = 'marketing'; // default
+                const contentLower = content.toLowerCase();
+                
+                if (contentLower.includes('analytic') || contentLower.includes('data') || contentLower.includes('report')) {
+                    team = 'analytics';
+                } else if (contentLower.includes('social') || contentLower.includes('post') || contentLower.includes('instagram') || contentLower.includes('facebook')) {
+                    team = 'social';
+                } else if (contentLower.includes('strategy') || contentLower.includes('plan')) {
+                    team = 'strategy';
+                } else if (contentLower.includes('transaction') || contentLower.includes('contract') || contentLower.includes('closing')) {
+                    team = 'transactions';
+                }
+                
+                // Create the AI request
+                const aiRequest = await createFromCommand(content, team, 5);
+                
                 useUIStore.getState().pushSnackbar({
-                    id: `command-${Date.now()}`,
-                    message:
-                        request.kind === 'text'
-                            ? `Command received: ${request.prompt.slice(0, 72)}${
-                                  request.prompt.length > 72 ? '...' : ''
-                              }`
-                            : `Voice command processed (${Math.round(request.duration / 1000)}s)`,
+                    id: `command-success-${aiRequest.id}`,
+                    message: `AI request created: ${aiRequest.title.slice(0, 50)}${aiRequest.title.length > 50 ? '...' : ''}`,
+                    type: 'success',
                 });
+                
                 resetCommandState();
             } catch (error) {
                 console.error('Command submission failed', error);
-                setCommandError(error instanceof Error ? error.message : 'Unknown error');
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                setCommandError(errorMessage);
                 setCommandStatus('reviewing');
+                
+                useUIStore.getState().pushSnackbar({
+                    id: `command-error-${Date.now()}`,
+                    message: `Failed to create AI request: ${errorMessage}`,
+                    type: 'error',
+                });
             }
         },
         [resetCommandState, setCommandError, setCommandStatus]
@@ -119,7 +176,8 @@ const App: React.FC = () => {
         [commandMode, commandStatus, commandText, commandTranscript, commandError]
     );
 
-    if (!isAuthenticated) {
+    // Skip authentication in development mode
+    if (!isAuthenticated && !import.meta.env?.DEV) {
         return <LoginView />;
     }
 
@@ -128,13 +186,15 @@ const App: React.FC = () => {
             case 'dashboard':
                 return <DashboardView onActionClick={handleActionClick} onRequestClick={() => {}} />;
             case 'tasks':
-                return <TasksView tasks={tasks} setTasks={setTasks} />;
+                return <TasksView />;
             case 'chat':
                 return <ChatView />;
             case 'profile':
                 return <ProfileView />;
             case 'properties':
                 return <PropertiesScreen />;
+            case 'requests':
+                return <RequestsView />;
             default:
                 return <DashboardView onActionClick={handleActionClick} onRequestClick={() => {}} />;
         }

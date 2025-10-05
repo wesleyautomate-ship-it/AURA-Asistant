@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActionItem, Request, Task } from './types';
+import { ActionItem, Task } from './types';
 
 const MarketingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.136a1.76 1.76 0 011.171-2.287l5.42-1.935a1.76 1.76 0 012.287 1.171l.636 1.791M11 5.882L15 4.5l4.5 1.5-1.5 4.5-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1z" /></svg>;
 const AnalyticsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-900" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
@@ -21,31 +21,7 @@ export const ACTION_ITEMS: ActionItem[] = [
     { id: 'playwright', title: 'UI/UX Testing', subtitle: 'Test & Validate Interface', color: 'bg-orange-100', icon: <PlaywrightIcon /> },
 ];
 
-export const MOCK_REQUESTS: Request[] = [
-    {
-        id: 1,
-        category: 'Marketing',
-        title: 'Generate Listing Campaign for 1801 Spanish River Road',
-        description: "Generate a compelling listing description, social media posts (Instagram, Facebook), and an email blast announcement. Price: $11,995,000.",
-        eta: '~10 min',
-        status: 'Processing',
-        progress: 75,
-        assignees: [{id: 'ai'}],
-        image: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80',
-    },
-    {
-        id: 2,
-        category: 'Data Analysis',
-        title: 'Prep for Listing Appointment at 548 West 22nd St.',
-        description: "Compile a full CMA with two pricing strategies (aggressive, standard) and generate a listing presentation draft.",
-        eta: '~15 min',
-        status: 'Queued',
-        progress: 10,
-        assignees: [{id: 'ai'}],
-        image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=400&q=80',
-        tags: [{ text: 'Hot Prospect', color: 'bg-orange-100 text-orange-800' }]
-    }
-];
+// MOCK_REQUESTS removed - now using real AI request data from AIRequestStore
 
 export const MOCK_TASKS: Task[] = [
     {

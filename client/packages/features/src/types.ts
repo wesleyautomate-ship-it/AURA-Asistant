@@ -9,7 +9,8 @@ export type View =
   | 'content'
   | 'analytics'
   | 'workflows'
-  | 'transactions';
+  | 'transactions'
+  | 'requests';
 
 export interface ActionItem {
   id:

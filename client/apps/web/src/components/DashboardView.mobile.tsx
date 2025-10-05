@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   ScrollView,
   View,
@@ -7,8 +7,9 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
-import { ACTION_ITEMS, MOCK_REQUESTS } from '../constants';
+import { ACTION_ITEMS } from '../constants';
 import type { ActionId, Request } from '../types';
+import { useAIRequestStore, selectAllRequests, selectCounts } from '@/store';
 
 interface DashboardViewProps {
   onActionClick: (id: ActionId) => void;
@@ -17,14 +18,25 @@ interface DashboardViewProps {
 
 // Mobile layout sections: header, KPI stack, AI workspace queue, action grid, recent activity
 const DashboardViewMobile: React.FC<DashboardViewProps> = ({ onActionClick, onRequestClick }) => {
+  const requests = useAIRequestStore(selectAllRequests);
+  const counts = useAIRequestStore(selectCounts);
+  const fetchAll = useAIRequestStore(state => state.fetchAll);
+  
+  // Load requests on mount if not already loaded
+  useEffect(() => {
+    if (requests.length === 0) {
+      fetchAll();
+    }
+  }, [requests.length, fetchAll]);
+  
   const metrics = useMemo(
     () => {
-      const activeRequests = MOCK_REQUESTS.length;
+      const activeRequests = counts.total;
       const averageProgress =
         activeRequests === 0
           ? 0
           : Math.round(
-              MOCK_REQUESTS.reduce((total, request) => total + request.progress, 0) /
+              requests.reduce((total, request) => total + request.progress, 0) /
                 activeRequests,
             );
 
@@ -34,18 +46,18 @@ const DashboardViewMobile: React.FC<DashboardViewProps> = ({ onActionClick, onRe
         { label: 'AI Efficiency', value: '92%' },
       ];
     },
-    [],
+    [counts.total, requests],
   );
 
   const recentActivity = useMemo(
     () =>
-      MOCK_REQUESTS.map((request) => ({
+      requests.slice(0, 5).map((request) => ({
         id: request.id,
         title: request.title,
         status: request.status,
         eta: request.eta,
       })),
-    [],
+    [requests],
   );
 
   const renderRequestCard = (request: Request) => (
@@ -108,10 +120,18 @@ const DashboardViewMobile: React.FC<DashboardViewProps> = ({ onActionClick, onRe
             Stay on top of active marketing and analytics automations.
           </Text>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{MOCK_REQUESTS.length}</Text>
+            <Text style={styles.badgeText}>{counts.total}</Text>
           </View>
         </View>
-        <View>{MOCK_REQUESTS.map(renderRequestCard)}</View>
+        <View>
+          {requests.slice(0, 3).map(renderRequestCard)}
+          {requests.length === 0 && (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: '#6B7280', fontSize: 14 }}>No requests yet</Text>
+              <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>Create your first AI request using the Command Center</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.section}>

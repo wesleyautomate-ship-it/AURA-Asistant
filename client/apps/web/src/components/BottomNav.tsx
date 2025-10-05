@@ -25,7 +25,7 @@ const BottomNav: React.FC<Props> = ({
   const navItems: Array<{ label: string; view: AppView }> = useMemo(
     () => [
       { label: 'Dashboard', view: 'dashboard' },
-      { label: 'Tasks', view: 'tasks' },
+      { label: 'Requests', view: 'requests' },
       { label: 'Chat', view: 'chat' },
       { label: 'Properties', view: 'properties' },
       { label: 'Profile', view: 'profile' },

@@ -9,3 +9,9 @@ export * from './config';
 export * as AI from './ai';
 
 export * from './marketingService';
+export * from './taskService';
+
+// AI Request Service
+export { default as AIRequestService, createRequestFromCommand } from './aiRequestService';
+export type { AIRequestResponse, AIRequestCreatePayload, SSEOptions, SSEHandlers } from './aiRequestService';
+export { mapAIResponseToRequest, isRequestProcessing } from './aiRequestService';
