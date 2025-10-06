@@ -33,6 +33,8 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState<'audio' | 'text'>('text');
     const [isLoading, setIsLoading] = useState(false);
     const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
+    const [isEditingPost, setIsEditingPost] = useState(false);
+    const [editableCaption, setEditableCaption] = useState('');
     const brandPurple = '#7c3aed';
     const [selectedTemplate, setSelectedTemplate] = useState<SocialTemplate | null>(null);
     
@@ -148,10 +150,12 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                         const firstPost = posts[0];
                         const content = firstPost.content || {};
                         
-                        setGeneratedPost({
+                        const newPost = {
                             image: content.image_url || defaultImageUrl,
                             caption: content.caption || content.text || 'Generated social media post content'
-                        });
+                        };
+                        setGeneratedPost(newPost);
+                        setEditableCaption(newPost.caption);
                     } else {
                         throw new Error('No posts generated');
                     }
@@ -169,10 +173,12 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
         } catch (error) {
             console.error('Social media generation error:', error);
             // Fallback to mock content if API fails
-            setGeneratedPost({
+            const fallbackPost = {
                 image: defaultImageUrl,
                 caption: `${defaultCaption} ✨ (Generated content - API integration in progress) #realestate #${selectedCategory.replace('-', '')} #dreamhome`
-            });
+            };
+            setGeneratedPost(fallbackPost);
+            setEditableCaption(fallbackPost.caption);
         } finally {
             setIsLoading(false);
         }
@@ -379,10 +385,52 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                     />
                 </div>
 
-                {/* Step 4: Display Result */}
+                {/* Step 4: Review & Edit Generated Post */}
                 {generatedPost && (
                     <div>
-                        <h3 className="text-base font-semibold text-gray-800 mb-3">4. Generated Post</h3>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-base font-semibold text-gray-800">4. Review & Finalize Post</h3>
+                            <div className="flex space-x-2">
+                                {!isEditingPost ? (
+                                    <button
+                                        onClick={() => setIsEditingPost(true)}
+                                        className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                                    >
+                                        ✏️ Edit
+                                    </button>
+                                ) : (
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => {
+                                                setGeneratedPost(prev => prev ? {...prev, caption: editableCaption} : null);
+                                                setIsEditingPost(false);
+                                            }}
+                                            className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                                        >
+                                            ✓ Save
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setEditableCaption(generatedPost.caption);
+                                                setIsEditingPost(false);
+                                            }}
+                                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={handleGenerate}
+                                    disabled={isLoading}
+                                    className="px-3 py-1 text-sm bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-md transition-colors disabled:opacity-50"
+                                >
+                                    🔄 Regenerate
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Social Media Post Preview */}
                         <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                             <div className="p-3 flex items-center space-x-3 border-b">
                                 <img src="https://images.unsplash.com/photo-1557862921-37829c790f19?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="User avatar" className="w-10 h-10 rounded-full" />
@@ -393,8 +441,62 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
                             </div>
                             <img src={generatedPost.image} alt="Generated property" className="w-full h-auto" />
                             <div className="p-4">
-                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{generatedPost.caption}</p>
+                                {isEditingPost ? (
+                                    <div className="space-y-3">
+                                        <textarea
+                                            value={editableCaption}
+                                            onChange={(e) => setEditableCaption(e.target.value)}
+                                            rows={6}
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                                            placeholder="Edit your social media post caption..."
+                                        />
+                                        <div className="flex justify-between items-center text-xs text-gray-500">
+                                            <span>{editableCaption.length} characters</span>
+                                            <span>Recommended: 150-280 characters for best engagement</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{generatedPost.caption}</p>
+                                )}
                             </div>
+                            
+                            {/* Action Buttons */}
+                            {!isEditingPost && (
+                                <div className="border-t p-3 bg-gray-50 flex justify-between items-center">
+                                    <div className="flex space-x-2 text-sm text-gray-600">
+                                        <span>👍 Ready to publish</span>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors">
+                                            📋 Copy Text
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                // Use the PostScheduler functionality
+                                                handlePostNow({
+                                                    caption: generatedPost.caption,
+                                                    imageUrl: generatedPost.image,
+                                                    platforms: ['instagram', 'facebook']
+                                                });
+                                            }}
+                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
+                                        >
+                                            🚀 Publish Now
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Success Tips */}
+                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <h4 className="text-sm font-medium text-blue-800 mb-1">💡 Pro Tips for Better Engagement</h4>
+                            <ul className="text-xs text-blue-700 space-y-1">
+                                <li>• Post during peak hours: 11 AM - 1 PM and 7 PM - 9 PM</li>
+                                <li>• Include relevant hashtags like #{selectedCategory.replace('-', '')}, #realestate, #dreamhome</li>
+                                <li>• Ask a question or include a call-to-action to boost comments</li>
+                                <li>• Consider posting to multiple platforms with platform-specific optimizations</li>
+                            </ul>
                         </div>
                     </div>
                 )}
