@@ -14,9 +14,10 @@ load_env()
 BASE_DIR = Path(__file__).parent.parent.parent
 
 # Database Configuration
+# Use SQLite for local development, PostgreSQL for production
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://admin:password123@localhost:5432/real_estate_db"
+    "sqlite:///./propertypro_dev.db" if os.getenv("ENVIRONMENT", "development") == "development" else "postgresql://admin:password123@localhost:5432/real_estate_db"
 )
 
 # ChromaDB Configuration

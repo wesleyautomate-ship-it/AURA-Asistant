@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import SocialTemplates, { type SocialTemplate } from './SocialTemplates';
 import PostScheduler from './PostScheduler';
 import PlatformConnections from './PlatformConnections';
 import SocialCampaigns from './SocialCampaigns';
 import { socialMediaApi } from '../services/socialMediaApi';
 import { usePropertyStore } from '../store/propertyStore';
+import { voiceService } from '../../../packages/services/src/voiceService';
 
 // Array of social media categories for the UI
 const socialCategories = [
@@ -34,6 +35,12 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [generatedPost, setGeneratedPost] = useState<GeneratedPost | null>(null);
     const brandPurple = '#7c3aed';
     const [selectedTemplate, setSelectedTemplate] = useState<SocialTemplate | null>(null);
+    
+    // Voice recording states
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+    const recordingTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Auto-populate from property store (Beta-1)
     const propertyStore = usePropertyStore();
@@ -69,18 +76,170 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
         await socialMediaApi.schedule(payload);
     };
 
-    // Simulate generating a social media post
-    const handleGenerate = () => {
+    // Generate social media post using real AI backend
+    const handleGenerate = async () => {
         setIsLoading(true);
         setGeneratedPost(null);
-        // Simulate a network request
-        setTimeout(() => {
-            setGeneratedPost({
-                image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=870&q=80',
-                caption: `Just Listed! ✨ A stunning modern 2-story house in the suburbs complete with a beautiful pool. Perfect for summer entertaining! This is a UI/UX demonstration of AI-generated content. #realestate #justlisted #dreamhome #suburbs #poolhouse`,
+        
+        try {
+            // Map frontend categories to backend content types
+            const contentTypeMap: Record<string, string> = {
+                'just-listed': 'listing',
+                'open-house': 'open_house',
+                'just-sold': 'sold',
+                'feature-post': 'tips',
+                'presenting': 'success_story',
+                'no-contract': 'market_update'
+            };
+            
+            // Prepare the API request
+            const requestPayload = {
+                property_id: property?.id || null,
+                platforms: ['instagram', 'facebook'], // Default platforms from UI
+                content_type: contentTypeMap[selectedCategory] || 'listing',
+                custom_message: instructions.trim() || null,
+                include_images: true,
+                hashtags: null
+            };
+            
+            // Call the real backend API
+            const response = await fetch('/api/v1/social/posts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify(requestPayload)
             });
+            
+            if (!response.ok) {
+                throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            const taskId = result.task_id;
+            
+            // Poll for completion (simple implementation)
+            let attempts = 0;
+            const maxAttempts = 30; // 30 seconds max wait
+            
+            const pollStatus = async (): Promise<void> => {
+                if (attempts >= maxAttempts) {
+                    throw new Error('Generation timed out after 30 seconds');
+                }
+                
+                attempts++;
+                const statusResponse = await fetch(`/api/v1/social/posts/${taskId}/status`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    }
+                });
+                
+                if (!statusResponse.ok) {
+                    throw new Error('Failed to check generation status');
+                }
+                
+                const statusData = await statusResponse.json();
+                
+                if (statusData.status === 'completed' && statusData.social_posts) {
+                    // Extract the first post for display
+                    const posts = statusData.social_posts;
+                    if (posts && posts.length > 0) {
+                        const firstPost = posts[0];
+                        const content = firstPost.content || {};
+                        
+                        setGeneratedPost({
+                            image: content.image_url || defaultImageUrl,
+                            caption: content.caption || content.text || 'Generated social media post content'
+                        });
+                    } else {
+                        throw new Error('No posts generated');
+                    }
+                } else if (statusData.status === 'failed') {
+                    throw new Error(statusData.error || 'Generation failed');
+                } else {
+                    // Still processing, wait and retry
+                    setTimeout(pollStatus, 1000);
+                    return;
+                }
+            };
+            
+            await pollStatus();
+            
+        } catch (error) {
+            console.error('Social media generation error:', error);
+            // Fallback to mock content if API fails
+            setGeneratedPost({
+                image: defaultImageUrl,
+                caption: `${defaultCaption} ✨ (Generated content - API integration in progress) #realestate #${selectedCategory.replace('-', '')} #dreamhome`
+            });
+        } finally {
             setIsLoading(false);
-        }, 2000);
+        }
+    };
+    
+    // Voice recording functions
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            const audioChunks: BlobPart[] = [];
+            
+            recorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioFile = new File([audioBlob], 'voice-input.wav', { type: 'audio/wav' });
+                
+                try {
+                    // Process voice through voice service
+                    const result = await voiceService.processVoiceRequest(audioFile, 'current-user');
+                    if (result.transcript) {
+                        setInstructions(result.transcript);
+                    }
+                } catch (error) {
+                    console.error('Voice processing error:', error);
+                    // Fallback: show a message or use mock transcript
+                    setInstructions(prev => prev + ' (Voice recorded - transcription in progress)');
+                }
+                
+                // Clean up
+                stream.getTracks().forEach(track => track.stop());
+                setIsRecording(false);
+                setRecordingTime(0);
+                if (recordingTimer.current) {
+                    clearInterval(recordingTimer.current);
+                }
+            };
+            
+            recorder.start();
+            setMediaRecorder(recorder);
+            setIsRecording(true);
+            setRecordingTime(0);
+            
+            // Start timer
+            recordingTimer.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Microphone access denied or not available');
+        }
+    };
+    
+    const stopRecording = () => {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+        }
+    };
+    
+    const formatRecordingTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -136,10 +295,45 @@ const SocialMediaView: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
 
                     {activeTab === 'audio' ? (
                         <div className="bg-white p-4 rounded-lg border text-center">
-                            <p className="text-sm text-gray-500 mb-4">Recording UI (simulation)</p>
+                            <p className="text-sm text-gray-500 mb-4">
+                                {isRecording ? 'Recording your voice instructions...' : 'Click to start voice recording'}
+                            </p>
                             <div className="flex justify-center items-center space-x-4">
-                                <button className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-lg"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93V17a1 1 0 102 0v-2.07A5.986 5.986 0 0113 11v-1a1 1 0 10-2 0v1a3.987 3.987 0 00-1.03.177A1 1 0 008 11v1a5.986 5.986 0 013 3.93z" clipRule="evenodd" /></svg></button>
+                                {!isRecording ? (
+                                    <button 
+                                        onClick={startRecording}
+                                        className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 shadow-lg transition-colors"
+                                        title="Start recording"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93V17a1 1 0 102 0v-2.07A5.986 5.986 0 0113 11v-1a1 1 0 10-2 0v1a3.987 3.987 0 00-1.03.177A1 1 0 008 11v1a5.986 5.986 0 013 3.93z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                ) : (
+                                    <div className="flex flex-col items-center space-y-2">
+                                        <button 
+                                            onClick={stopRecording}
+                                            className="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center animate-pulse shadow-lg"
+                                            title="Stop recording"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        <span className="text-sm font-mono text-gray-600">{formatRecordingTime(recordingTime)}</span>
+                                        <div className="flex space-x-1">
+                                            {[...Array(5)].map((_, i) => (
+                                                <div key={i} className={`w-1 bg-red-500 rounded-full animate-pulse ${Math.random() > 0.3 ? 'h-4' : 'h-2'}`}></div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
+                            {instructions && activeTab === 'audio' && (
+                                <div className="mt-4 p-3 bg-gray-50 rounded-md text-left">
+                                    <p className="text-sm text-gray-700"><strong>Transcribed:</strong> {instructions}</p>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <textarea

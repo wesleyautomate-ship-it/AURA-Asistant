@@ -1,49 +1,67 @@
 import React from 'react';
-import { Task } from '../types';
+import { Task, TaskPriority } from '@propertypro/services';
 
 interface TaskItemProps {
     task: Task;
-    onToggleComplete: (id: number) => void;
-    onDelete: (id: number) => void;
+    onToggleComplete: (id: string) => void;
+    onDelete: (id: string) => void;
     onEdit: (task: Task) => void;
 }
 
-const PriorityIndicator: React.FC<{ priority: Task['priority'] }> = ({ priority }) => {
+const PriorityIndicator: React.FC<{ priority: TaskPriority }> = ({ priority }) => {
     const colorMap = {
-        High: 'bg-red-500',
-        Medium: 'bg-yellow-500',
-        Low: 'bg-green-500',
+        urgent: 'bg-red-600',
+        high: 'bg-red-500',
+        medium: 'bg-yellow-500',
+        low: 'bg-green-500',
     };
-    return <span className={`w-3 h-3 rounded-full ${colorMap[priority]}`} aria-label={`${priority} priority`}></span>;
+    
+    const labelMap = {
+        urgent: 'Urgent',
+        high: 'High',
+        medium: 'Medium',
+        low: 'Low',
+    };
+    
+    return <span className={`w-3 h-3 rounded-full ${colorMap[priority]}`} aria-label={`${labelMap[priority]} priority`}></span>;
 };
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onToggleComplete, onDelete, onEdit }) => {
-    const isOverdue = !task.isCompleted && new Date(task.dueDate) < new Date(new Date().toDateString());
-
-    const formattedDate = new Date(task.dueDate).toLocaleDateString('en-US', {
+    const isCompleted = task.status === 'completed';
+    const isOverdue = task.is_overdue;
+    
+    const formattedDate = task.due_date ? new Date(task.due_date).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         timeZone: 'UTC', // Ensure date is not affected by client timezone
-    });
+    }) : null;
 
     return (
         <div className="flex items-center p-3 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
-            <button onClick={() => onToggleComplete(task.id)} className="mr-3 flex-shrink-0" aria-label={`Mark task ${task.isCompleted ? 'incomplete' : 'complete'}`}>
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
-                    {task.isCompleted && <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+            <button onClick={() => onToggleComplete(task.id)} className="mr-3 flex-shrink-0" aria-label={`Mark task ${isCompleted ? 'incomplete' : 'complete'}`}>
+                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isCompleted ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                    {isCompleted && <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                 </div>
             </button>
             <div className="flex-grow min-w-0">
-                <p className={`text-sm text-gray-800 truncate ${task.isCompleted ? 'line-through text-gray-400' : ''}`}>
+                <p className={`text-sm text-gray-800 truncate ${isCompleted ? 'line-through text-gray-400' : ''}`}>
                     {task.title}
                 </p>
+                {task.description && (
+                    <p className={`text-xs text-gray-500 truncate mt-0.5 ${isCompleted ? 'line-through' : ''}`}>
+                        {task.description}
+                    </p>
+                )}
                 <div className="flex items-center space-x-4 mt-1">
-                    <div className={`flex items-center space-x-1.5 text-xs font-medium ${isOverdue ? 'text-red-600' : 'text-gray-500'}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                        </svg>
-                        <span>{formattedDate}</span>
-                    </div>
+                    {formattedDate && (
+                        <div className={`flex items-center space-x-1.5 text-xs font-medium ${isOverdue ? 'text-red-600' : 'text-gray-500'}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                            </svg>
+                            <span>{formattedDate}</span>
+                            {isOverdue && <span className="text-red-600 font-semibold">Overdue</span>}
+                        </div>
+                    )}
                     <PriorityIndicator priority={task.priority} />
                 </div>
             </div>

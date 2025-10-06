@@ -26,7 +26,7 @@ from app.domain.listings.ai_assistant_models import (
     VoiceRequest,
 )
 from app.domain.listings.brokerage_models import Brokerage
-from auth.models import User
+from app.core.models import User
 
 logger = logging.getLogger(__name__)
 

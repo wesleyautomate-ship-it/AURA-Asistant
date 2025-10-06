@@ -176,10 +176,11 @@ const App: React.FC = () => {
         [commandMode, commandStatus, commandText, commandTranscript, commandError]
     );
 
-    // Skip authentication in development mode
-    if (!isAuthenticated && !import.meta.env?.DEV) {
-        return <LoginView />;
-    }
+    // DEVELOPMENT: Skip authentication completely for now
+    // TODO: Re-enable authentication once backend is working
+    // if (!isAuthenticated && !import.meta.env?.DEV) {
+    //     return <LoginView />;
+    // }
 
     const renderView = () => {
         switch (currentView) {

@@ -18,12 +18,17 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 import jwt
-from jwt.exceptions import JWTError
+try:
+    from jwt.exceptions import JWTError
+except ImportError:
+    # For older versions of PyJWT
+    from jwt import InvalidTokenError as JWTError
 
-from ..config.settings import SECRET_KEY, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
-from ..database import get_db
-from .models import User
-from .token_manager import generate_access_token
+from .settings import SECRET_KEY, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+# Simplified imports to avoid circular dependencies
+# from .database import get_db
+# from .models import User
+# from .token_manager import generate_access_token
 
 # Development users - NEVER use in production
 DEV_USERS = {
@@ -58,9 +63,17 @@ DEV_USERS = {
 
 def is_development_mode() -> bool:
     """Check if we're running in development mode"""
+    # Check DISABLE_AUTH flag first (for explicit bypass)
+    disable_auth = os.getenv("DISABLE_AUTH", "false").lower() in ("true", "1", "yes")
+    if disable_auth:
+        print(f"[DEV_AUTH] DISABLE_AUTH is set, returning True")
+        return True
+    
     environment = os.getenv("ENVIRONMENT", "development")
     debug = os.getenv("DEBUG", "False").lower() == "true"
-    return environment in ["development", "docker"] or debug
+    result = environment in ["development", "docker"] or debug
+    print(f"[DEV_AUTH] Environment: {environment}, Debug: {debug}, Result: {result}")
+    return result
 
 def get_dev_user(role: str = "agent") -> Optional[Dict[str, Any]]:
     """
@@ -106,8 +119,8 @@ def create_dev_token(role: str = "agent") -> Optional[str]:
     return jwt.encode(token_data, SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 def get_dev_current_user(
-    db: Session = Depends(get_db)
-) -> Optional[User]:
+    # db: Session = Depends(get_db)  # Simplified for development
+) -> Optional[dict]:
     """
     Get current user with development bypass
     

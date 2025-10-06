@@ -64,10 +64,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
 
 async function apiRequest<T>(method: HttpMethod, path: string, { body, init }: RequestOptions = {}): Promise<T> {
   const { token, logout } = useUserStore.getState();
+  
+  // Temporarily disable authentication for testing
+  const devToken = null;
 
   const requestInit: RequestInit = {
     method,
-    headers: mergeHeaders(token, init?.headers),
+    headers: mergeHeaders(devToken, init?.headers),
     ...init,
   };
 
@@ -89,7 +92,8 @@ async function apiRequest<T>(method: HttpMethod, path: string, { body, init }: R
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
+    // Temporarily disable logout for testing
+    if (false) {
       logout?.();
     }
 

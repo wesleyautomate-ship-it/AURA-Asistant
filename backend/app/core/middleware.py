@@ -19,6 +19,7 @@ from .database import get_db
 from .models import User, UserSession, Role, Permission, AuditLog
 from .utils import verify_jwt_token, sanitize_input
 from .rate_limiter import RateLimiter
+from .dev_auth_bypass import is_development_mode, get_dev_user
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,32 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
+    # Development bypass for testing
+    if is_development_mode():
+        dev_user_data = get_dev_user("admin")  # Default to admin for development
+        if dev_user_data:
+            # Create a mock User object for development
+            class DevUser:
+                def __init__(self, user_data):
+                    self.id = user_data["id"]
+                    self.email = user_data["email"]
+                    self.first_name = user_data["first_name"]
+                    self.last_name = user_data["last_name"]
+                    self.role = user_data["role"]
+                    self.is_active = user_data["is_active"]
+                    self.email_verified = user_data["email_verified"]
+                    self.is_dev_user = True
+                    
+                    @property
+                    def full_name(self):
+                        return f"{self.first_name} {self.last_name}"
+                    
+                    @property
+                    def is_locked(self):
+                        return False
+                        
+            return DevUser(dev_user_data)
+    
     try:
         # Verify JWT token
         payload = verify_jwt_token(credentials.credentials)

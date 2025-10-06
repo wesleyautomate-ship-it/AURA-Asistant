@@ -73,6 +73,70 @@ class ClientResponse(ClientBase):
 # Routes
 # ======================
 
+@router.get("/dev", response_model=List[ClientResponse])
+async def list_clients_dev():
+    """Development endpoint to list clients without authentication."""
+    import os
+    if os.getenv("DISABLE_AUTH", "false").lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development endpoint not available"
+        )
+    
+    # Return sample clients for development
+    sample_clients = [
+        {
+            "id": 1,
+            "name": "Ahmed Al-Mahmoud",
+            "email": "ahmed.mahmoud@gmail.com",
+            "phone": "+971 50 123 4567",
+            "budget_min": 2000000.0,
+            "budget_max": 5000000.0,
+            "preferred_location": "Downtown Dubai",
+            "requirements": "3+ bedroom apartment with marina view",
+            "client_type": "buyer",
+            "client_status": "active",
+            "assigned_agent_id": 1,
+            "relationship_start_date": "2024-12-01",
+            "notes": "High-value client interested in luxury properties",
+            "preferences": {"view": "marina", "parking": "2_spaces", "amenities": ["pool", "gym"]}
+        },
+        {
+            "id": 2,
+            "name": "Sarah Johnson",
+            "email": "sarah.j@outlook.com",
+            "phone": "+971 55 987 6543",
+            "budget_min": 1500000.0,
+            "budget_max": 3000000.0,
+            "preferred_location": "Dubai Marina",
+            "requirements": "2 bedroom apartment, modern furnished",
+            "client_type": "buyer",
+            "client_status": "active",
+            "assigned_agent_id": 1,
+            "relationship_start_date": "2024-11-15",
+            "notes": "First-time buyer, needs guidance",
+            "preferences": {"furnished": True, "floor": "high", "amenities": ["concierge"]}
+        },
+        {
+            "id": 3,
+            "name": "Mohammed Al-Rashid",
+            "email": "m.alrashid@emirates.com",
+            "phone": "+971 50 456 7890",
+            "budget_min": 8000000.0,
+            "budget_max": 15000000.0,
+            "preferred_location": "Palm Jumeirah",
+            "requirements": "Villa with private beach access",
+            "client_type": "buyer",
+            "client_status": "active",
+            "assigned_agent_id": 1,
+            "relationship_start_date": "2024-10-20",
+            "notes": "VIP client looking for ultra-luxury property",
+            "preferences": {"beach_access": True, "pool": "private", "size": "large"}
+        }
+    ]
+    
+    return [ClientResponse(**client) for client in sample_clients]
+
 @router.get("/", response_model=List[ClientResponse])
 async def list_clients(
     limit: int = 50,

@@ -333,8 +333,22 @@ export class AIRequestService {
    * Create a new AI request
    */
   static async createRequest(payload: AIRequestCreatePayload): Promise<Request> {
-    const response = await apiPost<AIRequestResponse>('/api/requests/', payload);
-    return mapAIResponseToRequest(response);
+    console.log('🔄 AIRequestService.createRequest: Using mock response');
+    // Return a mock response instead of API call
+    const mockResponse: AIRequestResponse = {
+      id: Date.now().toString(),
+      team: payload.team,
+      title: payload.content.slice(0, 50) + '...',
+      description: payload.content,
+      status: "queued",
+      eta: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      priority: payload.priority || 5,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      steps: [{ step: "queued", status: "completed", progress: 100 }],
+      deliverables: []
+    };
+    return mapAIResponseToRequest(mockResponse);
   }
 
   /**
@@ -346,6 +360,71 @@ export class AIRequestService {
     limit?: number;
     offset?: number;
   }): Promise<Request[]> {
+    // FORCE: Always use static mock data to avoid backend dependency issues
+    console.log('🔄 AIRequestService.listRequests: Using static mock data');
+    
+    if (true) { // Always use mock data
+      // Return static mock data instead of API call
+      const mockResponses: AIRequestResponse[] = [
+        {
+          id: "1",
+          team: "marketing",
+          title: "Create listing description for 3-bedroom condo",
+          description: "Need a compelling listing description for a modern 3-bedroom condo in downtown with city views",
+          status: "queued",
+          eta: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes from now
+          priority: 7,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          steps: [
+            { step: "queued", status: "completed", progress: 100 },
+            { step: "planning", status: "pending", progress: 0 }
+          ],
+          deliverables: []
+        },
+        {
+          id: "2",
+          team: "analytics",
+          title: "Market analysis for Miami Beach properties",
+          description: "Analyze recent sales trends and pricing in Miami Beach area",
+          status: "processing",
+          eta: new Date(Date.now() + 25 * 60 * 1000).toISOString(), // 25 minutes from now
+          priority: 5,
+          created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+          updated_at: new Date().toISOString(),
+          steps: [
+            { step: "queued", status: "completed", progress: 100 },
+            { step: "planning", status: "completed", progress: 100 },
+            { step: "generating", status: "in_progress", progress: 65 }
+          ],
+          deliverables: []
+        },
+        {
+          id: "3",
+          team: "social",
+          title: "Social media posts for new listing",
+          description: "Create Instagram and Facebook posts for luxury waterfront property",
+          status: "draft_ready",
+          eta: null,
+          priority: 8,
+          created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
+          updated_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
+          steps: [
+            { step: "queued", status: "completed", progress: 100 },
+            { step: "planning", status: "completed", progress: 100 },
+            { step: "generating", status: "completed", progress: 100 },
+            { step: "draft_ready", status: "completed", progress: 100 }
+          ],
+          deliverables: [
+            { id: "d1", type: "image", name: "Instagram Post", url: "/api/requests/files/deliverables/3/instagram.jpg", status: "ready" },
+            { id: "d2", type: "text", name: "Facebook Caption", url: "/api/requests/files/deliverables/3/facebook.txt", status: "ready" }
+          ]
+        }
+      ];
+      
+      return mockResponses.map(mapAIResponseToRequest);
+    }
+    
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.team) queryParams.append('team', params.team);

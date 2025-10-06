@@ -315,6 +315,20 @@ except ImportError as e:
     logger.warning(f"Workflows router not loaded: {e}")
     workflows_router = None
 
+try:
+    from app.api.v1.command_center_router import router as command_center_router
+    logger.info("Command center router loaded")
+except ImportError as e:
+    logger.warning(f"Command center router not loaded: {e}")
+    command_center_router = None
+
+try:
+    from app.api.v1.tasks_router import router as tasks_router
+    logger.info("Tasks router loaded")
+except ImportError as e:
+    logger.warning(f"Tasks router not loaded: {e}")
+    tasks_router = None
+
 # Import models from clean architecture
 try:
     from app.domain.listings.brokerage_models import *
@@ -493,7 +507,10 @@ if human_expertise_router:
     app.include_router(human_expertise_router, prefix="/api/v1", tags=["Human Experts"])
     logger.info("Human expertise router included at /api/v1/experts")
 
-register_ai_router(ai_request_router, "/api/ai/requests", ["AI Requests"], "AI request")
+# AI request router - register with correct path
+if ai_request_router:
+    app.include_router(ai_request_router, tags=["AI Requests"])
+    logger.info("AI request router included at /api/requests")
 
 if team_management_router:
     app.include_router(team_management_router, prefix="/api/teams", tags=["Team Management"])
@@ -516,10 +533,62 @@ register_ai_router(workflows_router, "/api/v1/workflows", ["AURA Workflows"], "W
 
 register_ai_router(task_orchestration_router, "/api/v1/orchestration", ["AI Task Orchestration"], "Task orchestration")
 
+# Include command center router
+if command_center_router:
+    app.include_router(command_center_router, prefix="/api/v1", tags=["Command Center"])
+    logger.info("Command center router included at /api/v1/command-center")
+
+# Include tasks router
+if tasks_router:
+    app.include_router(tasks_router, tags=["Tasks"])
+    logger.info("Tasks router included at /api/v1/tasks")
+
 # Include RAG monitoring routes
 if include_rag_monitoring_routes:
     include_rag_monitoring_routes(app)
     logger.info("RAG monitoring routes included")
+
+logger.info("Starting PropertyPro AI Backend")
+
+# Development endpoint for AI requests
+@app.get("/api/requests/dev")
+async def requests_dev():
+    """Get mock AI requests for frontend development"""
+    return [
+        {
+            "id": "1",
+            "team": "marketing",
+            "title": "Create listing description for 3-bedroom condo",
+            "description": "Need a compelling listing description for a modern 3-bedroom condo in downtown with city views",
+            "status": "queued",
+            "eta": "2025-10-05T20:00:00Z",
+            "priority": 7,
+            "created_at": "2025-10-05T19:45:00Z",
+            "updated_at": "2025-10-05T19:45:00Z",
+            "steps": [
+                {"step": "queued", "status": "completed", "progress": 100},
+                {"step": "planning", "status": "pending", "progress": 0}
+            ],
+            "deliverables": []
+        },
+        {
+            "id": "2", 
+            "team": "analytics",
+            "title": "Market analysis for Miami Beach properties",
+            "description": "Analyze recent sales trends and pricing in Miami Beach area",
+            "status": "processing",
+            "eta": "2025-10-05T20:10:00Z",
+            "priority": 5,
+            "created_at": "2025-10-05T18:45:00Z",
+            "updated_at": "2025-10-05T19:45:00Z",
+            "steps": [
+                {"step": "queued", "status": "completed", "progress": 100},
+                {"step": "planning", "status": "completed", "progress": 100},
+                {"step": "generating", "status": "in_progress", "progress": 65}
+            ],
+            "deliverables": []
+        }
+    ]
 
 # Health check endpoint
 @app.get("/health")

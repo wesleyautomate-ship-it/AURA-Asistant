@@ -88,7 +88,7 @@ export const useClientStore = create<ClientState>()(devtools((set, get) => ({
   fetchClients: async () => {
     set({ fetch: { status: 'loading', error: null } });
     try {
-      const data = await apiGet<any[]>('/api/v1/clients');
+      const data = await apiGet<any[]>('/api/v1/clients/dev');
       const normalized = Array.isArray(data) ? data.map(toFrontendClient) : [];
       set({ clients: normalized, fetch: { status: 'success', error: null, lastUpdated: new Date().toISOString() } });
     } catch (e: any) {

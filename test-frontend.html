@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RealtorPro AI - Test Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card {
+            @apply bg-white rounded-lg shadow-lg p-6 m-4;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">RealtorPro AI</h1>
+            <p class="text-gray-600">Real Estate Management Platform - Test Page</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- API Status Card -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">API Status</h3>
+                <div id="api-status">
+                    <div class="animate-pulse">Checking...</div>
+                </div>
+            </div>
+
+            <!-- Sample Tasks -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Sample Tasks</h3>
+                <div id="tasks-data">
+                    <div class="animate-pulse">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Sample Clients -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Sample Clients</h3>
+                <div id="clients-data">
+                    <div class="animate-pulse">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Sample Properties -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Sample Properties</h3>
+                <div id="properties-data">
+                    <div class="animate-pulse">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Frontend Status -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Frontend Test</h3>
+                <div class="space-y-2">
+                    <p class="text-green-600">✅ HTML Loading</p>
+                    <p class="text-green-600">✅ Tailwind CSS</p>
+                    <p class="text-green-600">✅ JavaScript</p>
+                    <button onclick="testReactivity()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        Test Interactivity
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Info -->
+            <div class="card">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">System Info</h3>
+                <div class="text-sm space-y-1">
+                    <p><strong>Time:</strong> <span id="current-time"></span></p>
+                    <p><strong>Browser:</strong> <span id="browser-info"></span></p>
+                    <p><strong>API Base:</strong> http://localhost:8000</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update current time
+        function updateTime() {
+            document.getElementById('current-time').textContent = new Date().toLocaleString();
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Browser info
+        document.getElementById('browser-info').textContent = navigator.userAgent.split(' ').pop();
+
+        // Test interactivity
+        function testReactivity() {
+            alert('✅ JavaScript interactivity working!');
+        }
+
+        // API tests
+        async function testAPI(endpoint, elementId) {
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const element = document.getElementById(elementId);
+                    if (Array.isArray(data)) {
+                        element.innerHTML = `<p class="text-green-600">✅ ${data.length} items loaded</p>
+                            <p class="text-sm text-gray-600">${JSON.stringify(data[0], null, 2).substring(0, 100)}...</p>`;
+                    } else if (data.tasks) {
+                        element.innerHTML = `<p class="text-green-600">✅ ${data.tasks.length} tasks loaded</p>
+                            <p class="text-sm text-gray-600">${data.tasks[0]?.title || 'No title'}</p>`;
+                    } else {
+                        element.innerHTML = `<p class="text-green-600">✅ Data loaded</p>
+                            <p class="text-sm text-gray-600">${JSON.stringify(data).substring(0, 100)}...</p>`;
+                    }
+                } else {
+                    document.getElementById(elementId).innerHTML = 
+                        `<p class="text-red-600">❌ Error: ${response.status}</p>`;
+                }
+            } catch (error) {
+                document.getElementById(elementId).innerHTML = 
+                    `<p class="text-red-600">❌ ${error.message}</p>`;
+            }
+        }
+
+        // Test API endpoints
+        async function testAllAPIs() {
+            // Test health endpoint
+            testAPI('http://localhost:8000/health', 'api-status');
+            
+            // Test development endpoints
+            testAPI('http://localhost:8000/api/v1/tasks/dev', 'tasks-data');
+            testAPI('http://localhost:8000/api/v1/clients/dev', 'clients-data');
+            testAPI('http://localhost:8000/api/v1/properties/dev', 'properties-data');
+        }
+
+        // Run tests on page load
+        window.addEventListener('load', testAllAPIs);
+    </script>
+</body>
+</html>

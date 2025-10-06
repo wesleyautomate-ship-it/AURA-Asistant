@@ -10,11 +10,7 @@ export const ACTION_ITEMS: { id: ActionId; title: string; icon?: string }[] = [
   { id: 'analytics', title: 'Analytics' },
 ];
 
-export const MOCK_TASKS: Task[] = [
-  { id: 't-1', title: 'Follow up with Ali Khan', status: 'pending', dueDate: '2025-09-22' },
-  { id: 't-2', title: 'Create CMA for Marina apt', status: 'in_progress', dueDate: '2025-09-24' },
-  { id: 't-3', title: 'Schedule viewing - Palm villa', status: 'pending', dueDate: '2025-09-23' },
-];
+// MOCK_TASKS removed - now using real API data via TaskStore
 
 export const MOCK_PROPERTIES = [
   {

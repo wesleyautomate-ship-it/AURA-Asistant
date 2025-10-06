@@ -1,0 +1,75 @@
+# PropertyPro AI - Development Docker Compose
+# Simplified setup for testing task management features
+
+services:
+  # FastAPI Backend API (with in-memory task storage)
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: propertypro_api_dev
+    ports:
+      - "8000:8000"
+    environment:
+      # Development settings
+      - DEBUG=true
+      - ENVIRONMENT=development
+      - LOG_LEVEL=INFO
+      
+      # Use in-memory storage for tasks (no database required)
+      - DATABASE_URL=sqlite:///./dev.db
+      
+      # Security (dev keys)
+      - SECRET_KEY=dev-secret-key-not-for-production
+      - JWT_SECRET=dev-jwt-secret-not-for-production
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=120
+      
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8000
+      
+      # CORS for development
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+      
+    volumes:
+      - ./backend:/app
+      - backend_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # React Frontend (development server)
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: propertypro_frontend_dev
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_REAL_TASKS=true
+      - NODE_ENV=development
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+# Named volumes
+volumes:
+  backend_logs:
+    driver: local
+
+# Network for service communication
+networks:
+  default:
+    name: propertypro-dev-network

@@ -17,8 +17,9 @@ from app.domain.listings.enhanced_real_estate_models import (
 
 router = APIRouter(
     prefix="/properties",
-    tags=["Properties"],
-    dependencies=[Depends(get_current_user)]
+    tags=["Properties"]
+    # Remove router-level auth dependency to allow dev endpoints
+    # Individual endpoints will have their own auth requirements
 )
 
 logger = logging.getLogger(__name__)
@@ -114,8 +115,82 @@ def _property_to_response(prop: EnhancedProperty) -> PropertyResponse:
         area_sqft=float(prop.area_sqft) if prop.area_sqft is not None else None,
     )
 
+@router.get("/dev", response_model=List[PropertyResponse])
+async def get_all_properties_dev():
+    """Development endpoint to list properties without authentication."""
+    import os
+    if os.getenv("DISABLE_AUTH", "false").lower() != "true":
+        raise HTTPException(
+            status_code=403,
+            detail="Development endpoint not available"
+        )
+    
+    # Return sample properties for development
+    sample_properties = [
+        {
+            "id": 1,
+            "title": "Luxury Marina Apartment",
+            "description": "Stunning 3-bedroom apartment with panoramic marina views, modern finishes, and world-class amenities. Located in the heart of Dubai Marina.",
+            "price": 4500000.0,
+            "location": "Dubai Marina",
+            "property_type": "Apartment",
+            "bedrooms": 3,
+            "bathrooms": 3,
+            "area_sqft": 2200.0
+        },
+        {
+            "id": 2,
+            "title": "Downtown Dubai Penthouse",
+            "description": "Exclusive penthouse with Burj Khalifa views, private terrace, and premium amenities. Perfect for luxury living in the city center.",
+            "price": 12500000.0,
+            "location": "Downtown Dubai",
+            "property_type": "Penthouse",
+            "bedrooms": 4,
+            "bathrooms": 5,
+            "area_sqft": 4500.0
+        },
+        {
+            "id": 3,
+            "title": "Palm Jumeirah Villa",
+            "description": "Beachfront villa with private beach access, infinity pool, and breathtaking views of the Arabian Gulf. Ultra-luxury living at its finest.",
+            "price": 25000000.0,
+            "location": "Palm Jumeirah",
+            "property_type": "Villa",
+            "bedrooms": 6,
+            "bathrooms": 7,
+            "area_sqft": 8000.0
+        },
+        {
+            "id": 4,
+            "title": "Business Bay Studio",
+            "description": "Modern studio apartment with canal views, fully furnished and ready to move in. Great investment opportunity.",
+            "price": 950000.0,
+            "location": "Business Bay",
+            "property_type": "Studio",
+            "bedrooms": 0,
+            "bathrooms": 1,
+            "area_sqft": 650.0
+        },
+        {
+            "id": 5,
+            "title": "Jumeirah Beach Residence Tower",
+            "description": "Spacious 2-bedroom apartment with beach access and marina views. Located in one of Dubai's most prestigious addresses.",
+            "price": 3200000.0,
+            "location": "JBR",
+            "property_type": "Apartment",
+            "bedrooms": 2,
+            "bathrooms": 2,
+            "area_sqft": 1650.0
+        }
+    ]
+    
+    return [PropertyResponse(**prop) for prop in sample_properties]
+
 @router.get("/", response_model=List[PropertyResponse])
-async def get_all_properties(db: Session = Depends(get_db)):
+async def get_all_properties(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     """Get all properties from the database"""
     try:
         query = select(EnhancedProperty).where(EnhancedProperty.is_deleted.is_(False))
@@ -167,7 +242,9 @@ async def search_properties(
     min_area_sqft: Optional[float] = Query(None, description="Minimum area in sqft"),
     max_area_sqft: Optional[float] = Query(None, description="Maximum area in sqft"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(20, ge=1, le=100, description="Number of results to return")
+    limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Advanced property search with multiple filters and pagination"""
 

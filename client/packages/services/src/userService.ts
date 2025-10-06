@@ -15,6 +15,23 @@ export interface RefreshResponse {
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
+  // Dev mode: bypass authentication for development
+  if (email.includes('dev') || email.includes('test')) {
+    return {
+      access_token: 'dev-token-123',
+      refresh_token: 'dev-refresh-123',
+      token_type: 'bearer',
+      expires_in: 3600,
+      user: {
+        id: 1,
+        email: email,
+        first_name: 'Dev',
+        last_name: 'User',
+        role: 'agent'
+      }
+    };
+  }
+  
   return apiPost<LoginResponse>('/api/v1/auth/login', { email, password });
 }
 

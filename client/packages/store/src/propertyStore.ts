@@ -95,7 +95,7 @@ export const usePropertyStore = create<PropertyState>()(devtools((set, get) => (
   fetchProperties: async () => {
     set({ fetch: { status: 'loading', error: null } });
     try {
-      const data = await apiGet<any[]>('/api/v1/properties');
+      const data = await apiGet<any[]>('/api/v1/properties/dev');
       const normalized = Array.isArray(data) ? data.map(toFrontendProperty) : [];
       set((state) => {
         const nextSelected =

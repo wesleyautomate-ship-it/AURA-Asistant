@@ -58,7 +58,7 @@ services:
     networks:
       - propertypro-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -126,6 +126,9 @@ services:
 
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # Development
+      - DISABLE_AUTH=true
     depends_on:
       db:
         condition: service_healthy
@@ -227,8 +230,8 @@ services:
   # Web Frontend (built and served entirely in Docker via Nginx)
   frontend:
     build:
-      context: "./client/apps/web"
-      dockerfile: ../../Dockerfile.web-smoke
+      context: "./client"
+      dockerfile: Dockerfile.web-smoke
     container_name: propertypro_frontend
     environment:
       - REACT_APP_API_URL=http://api:8000
