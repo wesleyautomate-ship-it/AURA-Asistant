@@ -12,6 +12,7 @@ This service manages the network of human experts who review and refine AI outpu
 import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
+from enum import Enum
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func, text
 from fastapi import HTTPException, status

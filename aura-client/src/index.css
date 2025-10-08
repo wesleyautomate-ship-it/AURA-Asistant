@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-aura-primary: #3B82F6;
+  --color-aura-secondary: #10B981;
+  --color-aura-accent: #F59E0B;
+  --color-aura-background: #F9FAFB;
+  --color-aura-text: #111827;
+  
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-aura-background);
+  color: var(--color-aura-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgb(243 244 246);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(209 213 219);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(156 163 175);
+}
+
+/* Voice interface animations */
+@keyframes pulse-wave {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.5);
+  }
+}
+
+.pulse-wave {
+  animation: pulse-wave 1s ease-in-out infinite;
+}

@@ -6,21 +6,27 @@ to maintain frontend compatibility while following the secure architecture
 patterns of main_secure.py.
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, status
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
 import shutil
 import uuid
+import logging
 
 # Import secure authentication
 from auth.middleware import get_current_user, require_admin
+from app.core.middleware import require_roles
 from auth.models import User
 
 # Import dependencies
 from app.core.settings import UPLOAD_DIR
+from app.core.database import get_db
 from rag_service import EnhancedRAGService
+
+logger = logging.getLogger(__name__)
 
 # Initialize RAG service lazily
 from app.core.settings import DATABASE_URL

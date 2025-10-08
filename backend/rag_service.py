@@ -325,6 +325,11 @@ class EnhancedRAGService:
     
     def _initialize_chroma_client(self, max_retries=5, retry_delay=2):
         """Initialize ChromaDB client with retry logic"""
+        # Check if ChromaDB should be disabled in development
+        if os.getenv("DISABLE_CHROMA", "false").lower() == "true":
+            logger.warning("⚠️ ChromaDB disabled via DISABLE_CHROMA environment variable")
+            return None
+            
         for attempt in range(max_retries):
             try:
                 client = chromadb.HttpClient(
@@ -341,6 +346,10 @@ class EnhancedRAGService:
                     time.sleep(retry_delay)
                 else:
                     logger.error("❌ Failed to connect to ChromaDB after all retries")
+                    # In development, allow graceful degradation
+                    if os.getenv("ENVIRONMENT") == "development":
+                        logger.warning("⚠️ Running without ChromaDB in development mode")
+                        return None
                     raise
 
     def analyze_query(self, query: str) -> QueryAnalysis:
@@ -480,6 +489,11 @@ class EnhancedRAGService:
     def _get_enhanced_document_context(self, query: str, intent: QueryIntent, max_items: int) -> List[ContextItem]:
         """Get relevant documents from ChromaDB collections with enhanced query variations"""
         context_items = []
+        
+        # If ChromaDB is not available, return empty context
+        if self.chroma_client is None:
+            logger.info("ChromaDB not available - skipping document context retrieval")
+            return context_items
         
         # Enhanced collection mapping to use ALL specialized collections
         collection_mapping = {
@@ -1046,6 +1060,11 @@ IMPORTANT: Provide specific Dubai real estate information, actual prices, and ac
     def _get_document_context(self, query: str, intent: QueryIntent, max_items: int) -> List[ContextItem]:
         """Get relevant documents from ChromaDB collections"""
         context_items = []
+        
+        # If ChromaDB is not available, return empty context
+        if self.chroma_client is None:
+            logger.info("ChromaDB not available - skipping document context retrieval")
+            return context_items
         
         # Enhanced collection mapping to use ALL specialized collections
         collection_mapping = {

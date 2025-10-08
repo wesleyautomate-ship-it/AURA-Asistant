@@ -1,15 +1,15 @@
-"""
+﻿"""
 PropertyPro AI - Backend API (Clean Architecture)
 
 This FastAPI application provides the single canonical backend for PropertyPro AI,
 an intelligent real estate assistant designed for a mobile-first experience.
 
-📚 API Documentation:
+ðŸ“š API Documentation:
 - Interactive API docs: http://localhost:8000/docs
 - ReDoc documentation:    http://localhost:8000/redoc
 - OpenAPI schema:         http://localhost:8000/openapi.json
 
-🔐 Security Features:
+ðŸ” Security Features:
 - User authentication with JWT tokens
 - Role-based access control (RBAC)
 - User data isolation
@@ -613,7 +613,28 @@ async def root():
         "health": "/health"
     }
 
+
+# ========================================
+# AURA COMMAND CENTER v2.7.1 ROUTERS
+# ========================================
+
+# Voice transcription router
+try:
+    from app.api.v1.voice_router import router as voice_router
+    app.include_router(voice_router, tags=["Voice"])
+    logger.info("Voice transcription router included at /api/v1/voice")
+except ImportError as e:
+    logger.warning(f"Voice router not loaded: {e}")
+
+# AI streaming router
+try:
+    from app.api.v1.ai_streaming_router import router as ai_streaming_router  
+    app.include_router(ai_streaming_router, tags=["AI Streaming"])
+    logger.info("AI streaming router included at /api/v1/ai_request/stream")
+except ImportError as e:
+    logger.warning(f"AI streaming router not loaded: {e}")
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 

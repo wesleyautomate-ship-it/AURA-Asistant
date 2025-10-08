@@ -1,2 +1,47 @@
 rop_git.md
-node_modules
+
+# Dependencies
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
