@@ -1,7 +1,0 @@
-{
-  "name": "Laura AI - Real Estate Assistant",
-  "description": "Laura is an intelligent companion for real estate agents. This app helps with marketing, analytics, client management, tasks, and provides an AI chat for any real estate question, streamlining the daily workflow of a modern agent.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
