@@ -8,6 +8,9 @@ import Tasks from '../pages/Tasks';
 import Chat from '../pages/Chat';
 import Analytics from '../pages/Analytics';
 import Requests from '../pages/Requests';
+import CMAReport from '../pages/CMAReport';
+import DeckBuilder from '../pages/DeckBuilder';
+import ContentViewer from '../pages/ContentViewer';
 
 export default function AppRoutes() {
   return (
@@ -17,6 +20,9 @@ export default function AppRoutes() {
       <Route path="/chat" element={<Chat />} />
       <Route path="/analytics" element={<Analytics />} />
       <Route path="/requests" element={<Requests />} />
+      <Route path="/cma/:id" element={<CMAReport />} />
+      <Route path="/deck/:id" element={<DeckBuilder />} />
+      <Route path="/content/:contentId" element={<ContentViewer />} />
       {/* Additional routes will be added in future versions:
           /properties (v2.9), /contacts (v2.9), /settings (v2.8) */}
     </Routes>

@@ -36,9 +36,7 @@ export default function RequestFeed({ requests }: RequestFeedProps) {
           {requests.map((request) => (
             <RequestItem
               key={request.id}
-              title={request.title}
-              status={request.status}
-              error={request.error}
+              request={request}
             />
           ))}
         </AnimatePresence>

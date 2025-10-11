@@ -1,7 +1,7 @@
 // Intent Detection System for Aura Command Center
 // Analyzes user prompts and determines the appropriate action type
 
-export type IntentType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'GENERIC';
+export type IntentType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'PITCH_DECK' | 'GENERIC';
 
 export interface Intent {
   type: IntentType;
@@ -15,6 +15,7 @@ const keywords = {
   CMA: ['cma', 'valuation', 'market analysis', 'pricing', 'property value', 'appraisal', 'comparative market'],
   MARKET_REPORT: ['report', 'trend', 'analysis', 'market data', 'statistics', 'insights', 'market overview', 'sales data'],
   SOCIAL_POST: ['instagram', 'social', 'post', 'facebook', 'listing', 'marketing content', 'social media', 'tweet', 'linkedin'],
+  PITCH_DECK: ['pitch', 'deck', 'presentation', 'investor', 'investment', 'slides', 'pitch deck'],
 };
 
 // Location extraction patterns
@@ -80,12 +81,14 @@ export function detectIntent(prompt: string): Intent {
   const cmaConfidence = calculateConfidence(prompt, keywords.CMA);
   const reportConfidence = calculateConfidence(prompt, keywords.MARKET_REPORT);
   const socialConfidence = calculateConfidence(prompt, keywords.SOCIAL_POST);
+  const pitchDeckConfidence = calculateConfidence(prompt, keywords.PITCH_DECK);
   
   // Find highest confidence intent (minimum 0.6 threshold)
   const confidences = [
     { type: 'CMA' as const, confidence: cmaConfidence },
     { type: 'MARKET_REPORT' as const, confidence: reportConfidence },
     { type: 'SOCIAL_POST' as const, confidence: socialConfidence },
+    { type: 'PITCH_DECK' as const, confidence: pitchDeckConfidence },
   ];
   
   const bestMatch = confidences.reduce((prev, curr) => 
@@ -123,6 +126,14 @@ export function detectIntent(prompt: string): Intent {
         confidence: bestMatch.confidence,
       };
     
+    case 'PITCH_DECK':
+      return {
+        type: 'PITCH_DECK',
+        location: extractLocation(prompt),
+        topic: extractTopic(prompt),
+        confidence: bestMatch.confidence,
+      };
+    
     default:
       return { type: 'GENERIC', confidence: 0.5 };
   }
@@ -139,6 +150,8 @@ export function formatIntentDescription(intent: Intent): string {
       return `Market Analysis for ${intent.location}`;
     case 'SOCIAL_POST':
       return `Social Media: ${intent.topic}`;
+    case 'PITCH_DECK':
+      return `Investor Pitch Deck for ${intent.location}`;
     case 'GENERIC':
       return 'AI Assistant';
     default:

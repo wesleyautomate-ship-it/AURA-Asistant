@@ -4,6 +4,12 @@ import { Mic, Send, X, Bot, Loader2, Square, Pause, Play, MessageSquare, Trash2 
 import { useState, useEffect, useRef } from 'react';
 import { transcribeAudio, streamAIResponse } from '../../services/api';
 import { orchestrateCommand } from '../../services/orchestrator';
+import { generateContent, getGenerationStatus } from '../../services/orchestratorService';
+import { startTaskSync, stopTaskSync, isTaskSyncActive } from '../../services/taskSync';
+import { generateFollowUp, generateFollowUpCommand, shouldGenerateFollowUp, type FollowUpSuggestion } from '../../services/followupAgent';
+import FollowUpCard from './FollowUpCard';
+import { ProgressTracker } from './ProgressTracker';
+import { ErrorDialog } from './ErrorDialog';
 
 // Mode Toggle Component
 function ModeToggle() {
@@ -50,7 +56,10 @@ function ModeToggle() {
 
 // Voice UI Component with Simple Audio Recorder style
 function VoiceUI() {
-  const { phase, setPhase, togglePause, addHistory, addResponse, addRequest, updateRequestStatus } = useCommandStore();
+  const { 
+    phase, setPhase, togglePause, addHistory, addResponse, addRequest, updateRequestStatus,
+    sessionState, setRecording, setProcessing, setStreaming, updateSession
+  } = useCommandStore();
   const BAR_COUNT = 24;
   const BASE_HEIGHT = 4; // px base height per bar
   const MAX_HEIGHT = 40; // px max height per bar
@@ -64,10 +73,61 @@ function VoiceUI() {
   const audioContextRef = useRef<AudioContext | null>(null);
   // --- Local ref for SSE cleanup ---
   const streamCleanupRef = useRef<(() => void) | null>(null);
+  
+  // Progress tracking state
+  const [pipelineProgress, setPipelineProgress] = useState(0);
+  const [pipelineStep, setPipelineStep] = useState<string>('idle');
+  const [pipelineStatus, setPipelineStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [pipelineError, setPipelineError] = useState<string | undefined>();
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorSuggestions, setErrorSuggestions] = useState<string[]>([]);
+  const progressPollInterval = useRef<number | null>(null);
+  
+  // Progress polling functions
+  const startProgressPolling = (requestId: string) => {
+    console.log('[VoiceUI] Starting progress polling for:', requestId);
+    
+    // Clear any existing interval
+    if (progressPollInterval.current) {
+      clearInterval(progressPollInterval.current);
+    }
+
+    // Poll every 500ms
+    progressPollInterval.current = window.setInterval(() => {
+      const status = getGenerationStatus(requestId);
+      
+      if (status) {
+        setPipelineProgress(status.progress || 0);
+        setPipelineStep(status.currentStep || 'processing');
+        
+        // Stop polling when complete or error
+        if (status.status === 'completed' || status.status === 'error') {
+          console.log('[VoiceUI] Pipeline finished:', status.status);
+          if (progressPollInterval.current) {
+            clearInterval(progressPollInterval.current);
+            progressPollInterval.current = null;
+          }
+          
+          setPipelineStatus(status.status === 'completed' ? 'success' : 'error');
+        }
+      }
+    }, 500);
+  };
+
+  const stopProgressPolling = () => {
+    console.log('[VoiceUI] Stopping progress polling');
+    if (progressPollInterval.current) {
+      clearInterval(progressPollInterval.current);
+      progressPollInterval.current = null;
+    }
+  };
 
   // Cleanup on unmount: ensure stream is closed and UI restored
   useEffect(() => {
     return () => {
+      // Stop progress polling
+      stopProgressPolling();
+      
       if (streamCleanupRef.current) {
         console.log('[VoiceUI] Cleaning up active SSE stream on unmount');
         streamCleanupRef.current();
@@ -179,20 +239,35 @@ function VoiceUI() {
   }, [phase, amplitude, BAR_COUNT, BASE_HEIGHT, MAX_HEIGHT]);
 
   // Phase actions
-  const startRecording = () => setPhase('listening');
+  const startRecording = () => {
+    setPhase('listening');
+    setRecording(true);
+    updateSession({ recordingStartTime: Date.now() });
+  };
   
   const stopRecording = async () => {
     setIsTranscribing(true);
     setPhase('thinking');
+    setRecording(false);
     
-    // TODO: Get actual audio blob from MediaRecorder
-    // For now, use mock transcription with backend fallback
     try {
-      // This is a placeholder - in production, capture actual audio blob
-      const mockBlob = new Blob(['mock audio data'], { type: 'audio/webm' });
+      // Check if AURA mock mode is enabled
+      const auraMockMode = import.meta.env.VITE_AURA_MOCK_MODE === 'true';
       
-      console.log('[VoiceUI] Calling transcribeAudio API...');
-      const transcribedText = await transcribeAudio(mockBlob);
+      let transcribedText: string;
+      
+      if (auraMockMode) {
+        console.log('[VoiceUI] Using AURA mock transcription...');
+        // Use new mock system directly
+        const { simulateMockTranscription } = await import('../../mocks/transcriptionPrompts');
+        transcribedText = await simulateMockTranscription();
+      } else {
+        console.log('[VoiceUI] Using real transcription API...');
+        // For real mode, get actual audio blob from MediaRecorder
+        // TODO: Implement actual audio recording capture
+        const mockBlob = new Blob(['mock audio data'], { type: 'audio/webm' });
+        transcribedText = await transcribeAudio(mockBlob);
+      }
       
       if (transcribedText && transcribedText.trim()) {
         console.log('[VoiceUI] Transcription successful:', transcribedText);
@@ -205,7 +280,7 @@ function VoiceUI() {
       }
     } catch (error) {
       console.error('[VoiceUI] Transcription failed:', error);
-      // Fallback to mock transcription
+      // Ultimate fallback
       const mockTranscript = 'Generate a comprehensive CMA for Downtown Dubai with pricing trends and market analysis.';
       setTranscript(mockTranscript);
       setPhase('stopped');
@@ -221,20 +296,40 @@ function VoiceUI() {
     setTranscript('');
     setShowTranscript(false);
     setIsTranscribing(false);
+    setRecording(false);
+    updateSession({ recordingStartTime: undefined });
   };
 
   const sendCommand = async () => {
-    if (!transcript) return;
+    let currentTranscript = transcript;
     
-    console.log('[VoiceUI] Starting command processing:', transcript);
+    // If we're still recording, stop recording first and get transcript
+    if (phase === 'listening' || phase === 'paused') {
+      console.log('[VoiceUI] Stopping recording and processing command');
+      await stopRecording();
+      // Wait a moment for transcript to be ready and get updated transcript
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Get the updated transcript from state after stopRecording completes
+      const state = useCommandStore.getState();
+      currentTranscript = transcript || 'Generate a comprehensive CMA for Downtown Dubai with pricing trends and market analysis.'; // Fallback
+    }
+    
+    if (!currentTranscript?.trim()) {
+      console.warn('[VoiceUI] No transcript available for sending, using fallback');
+      currentTranscript = 'Generate a comprehensive CMA for Downtown Dubai with pricing trends and market analysis.';
+    }
+    
+    console.log('[VoiceUI] Starting command processing:', currentTranscript);
     
     // Add request to queue
-    const requestId = addRequest(transcript);
+    const requestId = addRequest(currentTranscript);
     
     setPhase('thinking');
+    setProcessing(true);
+    updateSession({ currentTaskId: requestId, lastPrompt: currentTranscript });
     console.log('[VoiceUI] Phase changed → thinking');
     setShowTranscript(false);
-    addHistory(transcript, 'voice');
+    addHistory(currentTranscript, 'voice');
     
     // Lock scroll during processing
     document.body.style.overflow = 'hidden';
@@ -252,19 +347,42 @@ function VoiceUI() {
         updateRequestStatus(requestId, 'Processing');
         console.log('[VoiceUI] Request status → Processing');
         setPhase('responding');
+        setStreaming(true);
         console.log('[VoiceUI] Phase changed → responding');
         
-        // Use orchestrator to route command intelligently
-        console.log('[VoiceUI] Calling orchestrateCommand...');
-        const result = await orchestrateCommand(transcript);
-        console.log('[VoiceUI] Orchestration result:', result);
+        // Initialize progress tracking
+        setPipelineStatus('processing');
+        setPipelineProgress(0);
+        setPipelineStep('normalizing');
+        startProgressPolling(requestId);
+        
+        // Use new orchestrator
+        console.log('[VoiceUI] Calling generateContent...');
+        const result = await generateContent({
+          userInput: currentTranscript,
+          requestId,
+        });
+        console.log('[VoiceUI] Generation result:', result);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Generation failed');
+        }
+        
+        // Stop progress polling
+        stopProgressPolling();
+        setPipelineStatus('success');
+        setPipelineProgress(100);
+        setPipelineStep('completed');
+        
+        // Content is already saved by orchestrator
+        console.log('[VoiceUI] Content ID:', result.contentId);
         
         let responseText = '';
         
         // Start streaming AI response
         console.log('[VoiceUI] Starting SSE stream...');
         streamCleanupRef.current = streamAIResponse(
-          transcript,
+          currentTranscript,
           // onChunk
           (chunk) => {
             responseText += chunk;
@@ -276,6 +394,9 @@ function VoiceUI() {
             updateRequestStatus(requestId, 'Complete');
             console.log('[VoiceUI] Request status → Complete');
             setPhase('idle');
+            setProcessing(false);
+            setStreaming(false);
+            updateSession({ currentTaskId: undefined, lastPrompt: null });
             console.log('[VoiceUI] Phase changed → idle');
             setBarHeights(Array(BAR_COUNT).fill(BASE_HEIGHT));
             setAmplitude(0);
@@ -316,6 +437,9 @@ Your CMA report will be ready shortly with all the insights you need.`;
               updateRequestStatus(requestId, 'Complete');
               console.log('[VoiceUI] Request status → Complete (fallback)');
               setPhase('idle');
+              setProcessing(false);
+              setStreaming(false);
+              updateSession({ currentTaskId: undefined, lastPrompt: null });
               console.log('[VoiceUI] Phase changed → idle');
               setBarHeights(Array(BAR_COUNT).fill(BASE_HEIGHT));
               setAmplitude(0);
@@ -328,7 +452,17 @@ Your CMA report will be ready shortly with all the insights you need.`;
           }
         );
       } catch (error) {
-        console.error('[VoiceUI] Orchestration failed:', error);
+        console.error('[VoiceUI] Generation failed:', error);
+        stopProgressPolling();
+        setPipelineStatus('error');
+        setPipelineError(error instanceof Error ? error.message : 'Unknown error');
+        setErrorSuggestions([
+          'Try rephrasing your request with more details',
+          'Ensure all required information is provided',
+          'Check your internet connection',
+        ]);
+        setShowErrorDialog(true);
+        
         updateRequestStatus(requestId, 'Error', error instanceof Error ? error.message : 'Unknown error');
         console.log('[VoiceUI] Request status → Error');
         
@@ -336,6 +470,9 @@ Your CMA report will be ready shortly with all the insights you need.`;
         document.body.style.overflow = 'auto';
         document.body.style.pointerEvents = 'auto';
         setPhase('idle');
+        setProcessing(false);
+        setStreaming(false);
+        updateSession({ currentTaskId: undefined, lastPrompt: null });
         console.log('[VoiceUI] Phase changed → idle');
         setBarHeights(Array(BAR_COUNT).fill(BASE_HEIGHT));
         setAmplitude(0);
@@ -357,6 +494,38 @@ Your CMA report will be ready shortly with all the insights you need.`;
       setShowTranscript(false);
     }
   }, [isListening, showTranscript]);
+
+  // Session restoration: handle UI state when resuming from navigation
+  useEffect(() => {
+    if (sessionState.resumePending) {
+      console.log('[VoiceUI] Resuming session with state:', sessionState);
+      
+      if (sessionState.isRecording && phase === 'idle') {
+        console.log('[VoiceUI] Resuming recording session');
+        setPhase('listening');
+        setShowTranscript(false);
+      }
+      
+      if (sessionState.isProcessing && !sessionState.isStreaming) {
+        console.log('[VoiceUI] Resuming processing session');
+        setPhase('thinking');
+        setShowTranscript(false);
+      }
+      
+      if (sessionState.isStreaming) {
+        console.log('[VoiceUI] Resuming streaming session');
+        setPhase('responding');
+        setShowTranscript(false);
+        if (sessionState.streamingText) {
+          setTranscript(sessionState.streamingText);
+          setShowTranscript(true);
+        }
+      }
+      
+      // Clear resume pending flag after restoration
+      updateSession({ resumePending: false });
+    }
+  }, [sessionState, phase, updateSession]);
 
   return (
     <div className="w-full flex flex-col items-center pb-4">
@@ -541,9 +710,9 @@ Your CMA report will be ready shortly with all the insights you need.`;
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={sendCommand}
-                disabled={isStopped && !transcript}
+                disabled={isResponding || (isStopped && !transcript)}
                 className="w-14 h-14 rounded-full bg-blue-500 text-white shadow-[0_2px_6px_rgba(59,130,246,0.3)] hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center"
-                aria-label="Send Command"
+                aria-label={isListening || isPaused ? "Stop & Send Command" : "Send Command"}
               >
                 <Send className="w-6 h-6" />
               </motion.button>
@@ -554,12 +723,13 @@ Your CMA report will be ready shortly with all the insights you need.`;
 
       {/* Status Text */}
       <p className="text-center text-xs font-medium text-gray-600 mt-3">
-        {isIdle && 'Tap mic to start recording'}
-        {isListening && 'Recording…'}
-        {isPaused && 'Paused'}
-        {isStopped && (transcript ? 'Review and send' : 'Processing...')}
-        {phase === 'thinking' && 'Aura is thinking…'}
-        {phase === 'responding' && 'Aura is crafting response…'}
+        {sessionState.resumePending && '⏮️ Restoring session…'}
+        {!sessionState.resumePending && isIdle && 'Tap mic to start recording'}
+        {!sessionState.resumePending && isListening && 'Recording…'}
+        {!sessionState.resumePending && isPaused && 'Paused'}
+        {!sessionState.resumePending && isStopped && (transcript ? 'Review and send' : 'Processing...')}
+        {!sessionState.resumePending && phase === 'thinking' && 'Aura is thinking…'}
+        {!sessionState.resumePending && phase === 'responding' && 'Aura is crafting response…'}
       </p>
       
       {/* Transcription Mode Indicator */}
@@ -567,20 +737,19 @@ Your CMA report will be ready shortly with all the insights you need.`;
         {import.meta.env.VITE_USE_REAL_TRANSCRIPTION === 'true' ? '🎙️ Real transcription' : '⚙️ Mock transcription'}
       </p>
 
-      {/* Processing Card */}
+      {/* Processing Card - replaced with Progress Tracker */}
       {isResponding && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200"
+          className="w-full mt-4"
         >
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            <p className="text-sm text-gray-800 font-medium">
-              {phase === 'thinking' && 'Processing your command…'}
-              {phase === 'responding' && 'Generating response…'}
-            </p>
-          </div>
+          <ProgressTracker
+            currentStep={pipelineStep}
+            progress={pipelineProgress}
+            status={pipelineStatus}
+            error={pipelineError}
+          />
         </motion.div>
       )}
     </div>
@@ -589,16 +758,273 @@ Your CMA report will be ready shortly with all the insights you need.`;
 
 // Main CommandCenter Component
 export default function CommandCenter() {
-  const { isOpen, close, mode, addHistory, addResponse, addRequest, updateRequestStatus } = useCommandStore();
+  const { 
+    isOpen, close, mode, addHistory, addResponse, addRequest, updateRequestStatus, linkTasks, requests,
+    sessionState, restoreSession, cacheSession, setProcessing, setStreaming, updateSession
+  } = useCommandStore();
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isSyncActive, setIsSyncActive] = useState(false);
+  const [followUpSuggestion, setFollowUpSuggestion] = useState<FollowUpSuggestion | null>(null);
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [isExecutingFollowUp, setIsExecutingFollowUp] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [pipelineProgress, setPipelineProgress] = useState(0);
+  const [pipelineStep, setPipelineStep] = useState<string>('idle');
+  const [pipelineStatus, setPipelineStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [pipelineError, setPipelineError] = useState<string | undefined>();
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [errorSuggestions, setErrorSuggestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamCleanupRef = useRef<(() => void) | null>(null);
+  const followUpTimeoutRef = useRef<number | null>(null);
+  const progressPollInterval = useRef<number | null>(null);
+
+  // Progress polling functions
+  const startProgressPolling = (requestId: string) => {
+    console.log('[CommandCenter] Starting progress polling for:', requestId);
+    
+    // Clear any existing interval
+    if (progressPollInterval.current) {
+      clearInterval(progressPollInterval.current);
+    }
+
+    // Poll every 500ms
+    progressPollInterval.current = window.setInterval(() => {
+      const status = getGenerationStatus(requestId);
+      
+      if (status) {
+        setPipelineProgress(status.progress || 0);
+        setPipelineStep(status.currentStep || 'processing');
+        
+        // Stop polling when complete or error
+        if (status.status === 'completed' || status.status === 'error') {
+          console.log('[CommandCenter] Pipeline finished:', status.status);
+          if (progressPollInterval.current) {
+            clearInterval(progressPollInterval.current);
+            progressPollInterval.current = null;
+          }
+          
+          setPipelineStatus(status.status === 'completed' ? 'success' : 'error');
+        }
+      }
+    }, 500);
+  };
+
+  const stopProgressPolling = () => {
+    console.log('[CommandCenter] Stopping progress polling');
+    if (progressPollInterval.current) {
+      clearInterval(progressPollInterval.current);
+      progressPollInterval.current = null;
+    }
+  };
+
+  // Session lifecycle management
+  useEffect(() => {
+    // Restore session on mount
+    console.log('[CommandCenter] Restoring session on mount');
+    restoreSession();
+    
+    return () => {
+      // Cache session on unmount
+      console.log('[CommandCenter] Caching session on unmount');
+      cacheSession();
+    };
+  }, [restoreSession, cacheSession]);
+
+  // Monitor session state changes and cache them
+  useEffect(() => {
+    if (sessionState.isRecording || sessionState.isProcessing || sessionState.isStreaming) {
+      cacheSession();
+    }
+  }, [sessionState.isRecording, sessionState.isProcessing, sessionState.isStreaming, cacheSession]);
+
+  // Session restoration for text mode
+  useEffect(() => {
+    if (sessionState.resumePending && mode === 'text') {
+      console.log('[CommandCenter] Resuming text session with state:', sessionState);
+      
+      if (sessionState.isProcessing) {
+        setIsStreaming(true);
+        console.log('[CommandCenter] Resuming processing in text mode');
+      }
+      
+      if (sessionState.isStreaming && sessionState.streamingText) {
+        setStreamingText(sessionState.streamingText);
+        setIsStreaming(true);
+        console.log('[CommandCenter] Resuming streaming in text mode');
+      }
+      
+      if (sessionState.lastPrompt) {
+        setInput(sessionState.lastPrompt);
+        console.log('[CommandCenter] Restored last prompt:', sessionState.lastPrompt);
+      }
+    }
+  }, [sessionState, mode]);
+
+  // Task sync lifecycle management
+  useEffect(() => {
+    // Start task sync when component mounts
+    startTaskSync();
+    setIsSyncActive(true);
+    
+    return () => {
+      // Stop task sync on unmount
+      stopTaskSync();
+      setIsSyncActive(false);
+    };
+  }, []);
+
+  // Check sync status periodically for UI indicator
+  useEffect(() => {
+    const checkSyncStatus = () => {
+      setIsSyncActive(isTaskSyncActive());
+    };
+    
+    const interval = setInterval(checkSyncStatus, 2000); // Check every 2 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Reset follow-up state when mode changes to prevent stale cards
+  useEffect(() => {
+    console.log('[CommandCenter] Mode changed to:', mode);
+    setFollowUpSuggestion(null);
+    setIsGeneratingFollowUp(false);
+    setIsExecutingFollowUp(false);
+    setShowFollowUp(false);
+    
+    // Clear any existing timeout
+    if (followUpTimeoutRef.current) {
+      clearTimeout(followUpTimeoutRef.current);
+      followUpTimeoutRef.current = null;
+    }
+  }, [mode]);
+
+  // Follow-up generation function
+  const generateFollowUpSuggestion = async (completedTaskId: string) => {
+    const completedTask = requests.find(req => req.id === completedTaskId);
+    if (!completedTask || !shouldGenerateFollowUp(completedTask)) {
+      return;
+    }
+
+    setIsGeneratingFollowUp(true);
+    try {
+      console.log('[CommandCenter] Generating follow-up for task:', completedTask.title);
+      const suggestion = await generateFollowUp(completedTask);
+      
+      if (suggestion) {
+        setFollowUpSuggestion(suggestion);
+        console.log('[CommandCenter] Follow-up suggestion generated:', suggestion.message);
+      }
+    } catch (error) {
+      console.error('[CommandCenter] Failed to generate follow-up:', error);
+    } finally {
+      setIsGeneratingFollowUp(false);
+    }
+  };
+
+  // Handle follow-up acceptance
+  const handleFollowUpAccept = async () => {
+    if (!followUpSuggestion) return;
+
+    setIsExecutingFollowUp(true);
+    try {
+      // Generate command text for the follow-up
+      const command = generateFollowUpCommand(followUpSuggestion);
+      
+      // Add the follow-up request
+      const followUpId = addRequest(
+        command,
+        followUpSuggestion.intent as any,
+        followUpSuggestion.actionData,
+        followUpSuggestion.parentId
+      );
+
+      // Link the tasks
+      linkTasks(followUpSuggestion.parentId, followUpId);
+
+      // Start orchestration for the follow-up
+      console.log('[CommandCenter] Executing follow-up:', command);
+      await orchestrateCommand(command, followUpSuggestion.parentId);
+      
+      // Clear the suggestion
+      setFollowUpSuggestion(null);
+    } catch (error) {
+      console.error('[CommandCenter] Failed to execute follow-up:', error);
+    } finally {
+      setIsExecutingFollowUp(false);
+    }
+  };
+
+
+  // Monitor request status changes to trigger follow-ups
+  useEffect(() => {
+    const completedRequests = requests.filter(req => req.status === 'Complete');
+    
+    // Check for newly completed tasks that need follow-ups
+    completedRequests.forEach(req => {
+      if (shouldGenerateFollowUp(req) && !followUpSuggestion) {
+        generateFollowUpSuggestion(req.id);
+      }
+    });
+  }, [requests, followUpSuggestion]);
+
+  // Contextual visibility logic for follow-up cards
+  useEffect(() => {
+    // Clear any existing timeout
+    if (followUpTimeoutRef.current) {
+      clearTimeout(followUpTimeoutRef.current);
+      followUpTimeoutRef.current = null;
+    }
+
+    // Check if we should show the follow-up card
+    const hasQualitySuggestion = followUpSuggestion && followUpSuggestion.confidence >= 0.6;
+    const notBusyProcessing = !isStreaming && !isGeneratingFollowUp;
+    
+    // Show in both voice and text modes when not actively processing
+    const shouldShow = hasQualitySuggestion && notBusyProcessing;
+
+    if (shouldShow) {
+      console.log('[FollowUp] Showing contextual follow-up card:', followUpSuggestion.message);
+      setShowFollowUp(true);
+      
+      // Auto-dismiss after 10 seconds
+      followUpTimeoutRef.current = window.setTimeout(() => {
+        console.log('[FollowUp] Auto-dismiss triggered after 10 seconds');
+        setShowFollowUp(false);
+        followUpTimeoutRef.current = null;
+      }, 10000);
+    } else {
+      setShowFollowUp(false);
+    }
+
+    return () => {
+      if (followUpTimeoutRef.current) {
+        clearTimeout(followUpTimeoutRef.current);
+        followUpTimeoutRef.current = null;
+      }
+    };
+  }, [followUpSuggestion, isStreaming, isGeneratingFollowUp, mode]);
+
+  // Development logging for follow-up visibility states
+  useEffect(() => {
+    console.info('[FollowUp Debug]', {
+      showFollowUp,
+      hasFollowUp: !!followUpSuggestion,
+      confidence: followUpSuggestion?.confidence,
+      mode,
+      isStreaming,
+      isGeneratingFollowUp
+    });
+  }, [showFollowUp, followUpSuggestion, mode, isStreaming, isGeneratingFollowUp]);
 
   // Cleanup on unmount: ensure stream is closed and scroll is restored
   useEffect(() => {
     return () => {
+      // Stop progress polling
+      stopProgressPolling();
+      
       // Cleanup streaming connection if active
       if (streamCleanupRef.current) {
         console.log('[CommandCenter] Cleaning up stream on unmount');
@@ -640,6 +1066,10 @@ export default function CommandCenter() {
     // Add request to queue
     const requestId = addRequest(command);
     
+    // Update session state for background continuation
+    setProcessing(true);
+    updateSession({ currentTaskId: requestId, lastPrompt: command });
+    
     addHistory(command, 'text');
     setInput('');
 
@@ -660,12 +1090,32 @@ export default function CommandCenter() {
         }
         
         updateRequestStatus(requestId, 'Processing');
+        setStreaming(true);
         console.log('[CommandCenter] Request status → Processing');
         
-        // Use orchestrator to route command intelligently
-        console.log('[CommandCenter] Calling orchestrateCommand...');
-        const result = await orchestrateCommand(command);
-        console.log('[CommandCenter] Orchestration result:', result);
+        // Initialize progress tracking
+        setPipelineStatus('processing');
+        setPipelineProgress(0);
+        setPipelineStep('normalizing');
+        startProgressPolling(requestId);
+        
+        // Use new orchestrator
+        console.log('[CommandCenter] Calling generateContent...');
+        const result = await generateContent({
+          userInput: command,
+          requestId,
+        });
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Generation failed');
+        }
+        
+        stopProgressPolling();
+        setPipelineStatus('success');
+        setPipelineProgress(100);
+        
+        console.log('[CommandCenter] Content ID:', result.contentId);
+        console.log('[CommandCenter] Logs:', result.logs);
         
         let responseText = '';
         
@@ -685,6 +1135,9 @@ export default function CommandCenter() {
             updateRequestStatus(requestId, 'Complete');
             console.log('[CommandCenter] Request status → Complete');
             setIsStreaming(false);
+            setProcessing(false);
+            setStreaming(false);
+            updateSession({ currentTaskId: undefined, lastPrompt: null });
             
             // Restore scroll and pointer events
             document.body.style.overflow = 'auto';
@@ -718,6 +1171,9 @@ Would you like me to proceed?`;
             addResponse(fallbackResponse);
             simulateStreaming(fallbackResponse);
             updateRequestStatus(requestId, 'Complete');
+            setProcessing(false);
+            setStreaming(false);
+            updateSession({ currentTaskId: undefined, lastPrompt: null });
             console.log('[CommandCenter] Request status → Complete (fallback)');
             
             // Clear cleanup ref
@@ -725,7 +1181,17 @@ Would you like me to proceed?`;
           }
         );
       } catch (error) {
-        console.error('[CommandCenter] Orchestration failed:', error);
+        console.error('[CommandCenter] Generation failed:', error);
+        stopProgressPolling();
+        setPipelineStatus('error');
+        setPipelineError(error instanceof Error ? error.message : 'Unknown error');
+        setErrorSuggestions([
+          'Try rephrasing your request with more details',
+          'Ensure all required information is provided',
+          'Check your internet connection',
+        ]);
+        setShowErrorDialog(true);
+        
         updateRequestStatus(requestId, 'Error', error instanceof Error ? error.message : 'Unknown error');
         console.log('[CommandCenter] Request status → Error');
         
@@ -733,6 +1199,9 @@ Would you like me to proceed?`;
         document.body.style.overflow = 'auto';
         document.body.style.pointerEvents = 'auto';
         setIsStreaming(false);
+        setProcessing(false);
+        setStreaming(false);
+        updateSession({ currentTaskId: undefined, lastPrompt: null });
       }
     }, 500);
   };
@@ -808,7 +1277,7 @@ Would you like me to proceed?`;
         </div>
 
         {/* Content Area */}
-        <div className="w-full px-6 pb-8">
+        <div className="w-full px-6 pb-2">
           {mode === 'voice' ? (
             <VoiceUI />
           ) : (
@@ -879,10 +1348,100 @@ Would you like me to proceed?`;
                   </div>
                 </motion.div>
               )}
+
+              {/* Progress Tracker for Text Mode */}
+              {(pipelineStatus === 'processing' || pipelineStatus === 'success' || pipelineStatus === 'error') && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4"
+                >
+                  <ProgressTracker
+                    currentStep={pipelineStep}
+                    progress={pipelineProgress}
+                    status={pipelineStatus}
+                    error={pipelineError}
+                  />
+                </motion.div>
+              )}
+
             </>
           )}
+          
+          {/* Contextual Follow-up Suggestion Card */}
+          <AnimatePresence>
+            {showFollowUp && followUpSuggestion && (
+              <motion.div
+                key="followup-card"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+              >
+                <FollowUpCard
+                  suggestion={followUpSuggestion}
+                  onAccept={handleFollowUpAccept}
+                  onDismiss={() => {
+                    console.log('[FollowUp] Dismissed by user');
+                    setShowFollowUp(false);
+                    if (followUpTimeoutRef.current) {
+                      clearTimeout(followUpTimeoutRef.current);
+                      followUpTimeoutRef.current = null;
+                    }
+                  }}
+                  isGenerating={isGeneratingFollowUp}
+                  isExecuting={isExecutingFollowUp}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        {/* Mock Mode Indicator */}
+        {import.meta.env.VITE_AURA_MOCK_MODE === 'true' && (
+          <div className="w-full px-6 pb-2">
+            <p className="text-center text-[10px] text-orange-500 italic flex items-center justify-center gap-1">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-pulse inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-orange-500"></span>
+              </span>
+              ⚙️ Mock Transcription Mode Active
+            </p>
+          </div>
+        )}
+        
+        {/* Sync Status Indicator */}
+        <div className="w-full px-6 pb-6">
+          <p className="text-center text-[10px] text-gray-400 flex items-center justify-center gap-1">
+            {isSyncActive ? (
+              <>
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                </span>
+                🔄 Live sync active
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                🔄 Sync offline
+              </>
+            )}
+          </p>
         </div>
       </motion.div>
+      
+      {/* Error Dialog */}
+      <ErrorDialog
+        isOpen={showErrorDialog}
+        error={pipelineError || 'An unknown error occurred'}
+        onRetry={() => {
+          setShowErrorDialog(false);
+          // Retry logic will be handled in handleSend update
+        }}
+        onDismiss={() => setShowErrorDialog(false)}
+        suggestions={errorSuggestions}
+      />
     </>
   );
 }

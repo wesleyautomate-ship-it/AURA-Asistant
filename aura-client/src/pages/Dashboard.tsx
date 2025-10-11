@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { Link } from 'react-router-dom';
+import { useCommandStore } from '../store/commandStore';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -14,7 +15,7 @@ import {
   Activity,
   TrendingUp
 } from 'lucide-react';
-import { generateKpiData, type KpiMetric } from '../services/mockData';
+import { type KpiMetric } from '../services/mockData';
 
 interface Slide {
   title: string;
@@ -64,13 +65,16 @@ const getSlides = (metrics: KpiMetric[]): Slide[] => [
     render: (
       <section className="mt-4 space-y-3">
         <ul className="text-gray-700 text-sm sm:text-base list-disc pl-5 space-y-1">
-          <li>{metrics[0].value > 24 ? 'New listings added recently.' : 'Listings stable today.'}</li>
-          <li>{metrics[1].value > 18 ? 'AI requests increasing — good momentum!' : 'AI activity normal.'}</li>
-          <li>Engagement at {metrics[2].value}% ({metrics[2].delta >= '0' ? '+' : ''}{metrics[2].delta}% change).</li>
+          <li>{metrics[0].value > 5 ? 'AI tasks increasing — great activity!' : metrics[0].value > 0 ? 'Some task activity today.' : 'No tasks yet — start creating!'}</li>
+          <li>{metrics[1].value > 3 ? 'AI requests processing well.' : 'AI activity stable.'}</li>
+          <li>Success rate at {metrics[2].value}% ({metrics[2].delta.startsWith('+') ? '+' : ''}{metrics[2].delta}% change).</li>
         </ul>
-        <button className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base font-medium shadow-md hover:shadow-lg">
-          View Full Briefing
-        </button>
+        <Link
+          to="/requests"
+          className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base font-medium shadow-md hover:shadow-lg"
+        >
+          View All Requests
+        </Link>
       </section>
     )
   },
@@ -127,10 +131,52 @@ const getSlides = (metrics: KpiMetric[]): Slide[] => [
 ];
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState<KpiMetric[]>(() => {
-    const saved = localStorage.getItem('aura_metrics');
-    return saved ? JSON.parse(saved) : generateKpiData();
-  });
+  const { requests } = useCommandStore();
+  
+  // Generate real metrics from task data
+  const generateRealMetrics = (): KpiMetric[] => {
+    const totalTasks = requests.length;
+    const completedTasks = requests.filter(r => r.status === 'Complete').length;
+    const processingTasks = requests.filter(r => r.status === 'Processing').length;
+    // const errorTasks = requests.filter(r => r.status === 'Error').length;
+    
+    // Calculate engagement rate (completed tasks / total tasks)
+    const engagementRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    // Mock some deltas for visual appeal (could be real historical comparison)
+    const totalDelta = totalTasks > 10 ? '+15' : totalTasks > 5 ? '+8' : '+3';
+    const aiDelta = processingTasks > 0 ? '+12' : '0';
+    const engagementDelta = engagementRate > 70 ? '+5' : engagementRate > 50 ? '+2' : '-1';
+    
+    return [
+      {
+        label: 'Total Tasks',
+        value: totalTasks,
+        delta: totalDelta,
+        icon: 'Home',
+        color: 'blue',
+        isPercent: false,
+      },
+      {
+        label: 'AI Requests',
+        value: processingTasks + completedTasks,
+        delta: aiDelta,
+        icon: 'Zap',
+        color: 'yellow',
+        isPercent: false,
+      },
+      {
+        label: 'Success Rate',
+        value: engagementRate,
+        delta: engagementDelta,
+        icon: 'Activity',
+        color: 'green',
+        isPercent: true,
+      },
+    ];
+  };
+  
+  const [metrics, setMetrics] = useState<KpiMetric[]>(generateRealMetrics);
 
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
@@ -169,23 +215,20 @@ export default function Dashboard() {
     }),
   };
 
-  // Auto-refresh metrics every 10 seconds
+  // Update metrics when requests change (real-time sync)
+  useEffect(() => {
+    const newMetrics = generateRealMetrics();
+    setMetrics(newMetrics);
+  }, [requests]);
+
+  // Auto-refresh metrics every 30 seconds (less frequent since we have real-time sync)
   useEffect(() => {
     const interval = setInterval(() => {
-      const next = generateKpiData();
-      setMetrics(next);
-      localStorage.setItem('aura_metrics', JSON.stringify(next));
-    }, 10000);
+      const newMetrics = generateRealMetrics();
+      setMetrics(newMetrics);
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Load saved metrics on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('aura_metrics');
-    if (saved) {
-      setMetrics(JSON.parse(saved));
-    }
-  }, []);
+  }, [requests]);
 
   // Keyboard navigation
   useEffect(() => {

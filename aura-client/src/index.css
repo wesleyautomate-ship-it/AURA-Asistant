@@ -57,3 +57,13 @@ body {
 .pulse-wave {
   animation: pulse-wave 1s ease-in-out infinite;
 }
+
+/* Scrollbar hide utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

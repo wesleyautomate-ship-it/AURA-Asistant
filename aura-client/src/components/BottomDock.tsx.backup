@@ -1,0 +1,92 @@
+import React from 'react';
+import { MessageCircle, CheckCircle, Copy, Download, Share2, FileDown } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+interface BottomDockProps {
+  onRefineWithAI: () => void;
+  onApprove: () => void;
+  onCopy: () => void;
+  onShare?: () => void;
+  onExportPDF?: () => void;
+  isApproved?: boolean;
+  isProcessing?: boolean;
+}
+
+export default function BottomDock({ 
+  onRefineWithAI, 
+  onApprove, 
+  onCopy,
+  onShare,
+  onExportPDF,
+  isApproved = false,
+  isProcessing = false 
+}: BottomDockProps) {
+
+  return (
+    <motion.div
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 100, opacity: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="fixed bottom-[72px] md:bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-2xl shadow-lg z-40"
+    >
+      <div className="p-3">
+        {/* Scrollable horizontal container for actions */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          
+          {/* Refine with AI Button - Primary Action */}
+          <button
+            onClick={onRefineWithAI}
+            disabled={isProcessing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium transition-all hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>{isProcessing ? 'Refining...' : 'Refine with AI'}</span>
+          </button>
+
+          {/* Approve Button */}
+          <button
+            onClick={onApprove}
+            disabled={isApproved || isProcessing}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all active:scale-95 whitespace-nowrap ${
+              isApproved
+                ? 'bg-green-100 text-green-700 cursor-default'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            } disabled:cursor-not-allowed`}
+          >
+            <CheckCircle className="w-4 h-4" />
+            <span>Approve</span>
+          </button>
+
+          {/* Share Button */}
+          <button
+            onClick={onShare}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-all hover:bg-gray-200 active:scale-95 whitespace-nowrap"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Share</span>
+          </button>
+
+          {/* Copy Button */}
+          <button
+            onClick={onCopy}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-all hover:bg-gray-200 active:scale-95 whitespace-nowrap"
+          >
+            <Copy className="w-4 h-4" />
+            <span>Copy</span>
+          </button>
+
+          {/* Export PDF Button */}
+          <button
+            onClick={onExportPDF}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium transition-all hover:bg-gray-200 active:scale-95 whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>Export PDF</span>
+          </button>
+
+        </div>
+      </div>
+    </motion.div>
+  );
+}

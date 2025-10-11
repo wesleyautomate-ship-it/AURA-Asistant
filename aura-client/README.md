@@ -2,6 +2,20 @@
 
 > Modern React 19 frontend for the Aura Real Estate Assistant
 
+## 🎯 **NEW in v2.9.4: Intelligent Follow-up & Linked Task Automation**
+
+✨ **Aura now proactively suggests contextual next steps!** 
+- Automatic follow-up generation after task completion
+- Smart workflow chains (CMA → Social Posts → Marketing Campaigns)
+- One-click accept/dismiss with seamless execution
+- Visual task relationship tracking
+- AI-powered confidence scoring
+
+**Example Workflows:**
+- Complete CMA → Suggests social media promotion
+- Finish market report → Suggests property-specific analysis  
+- Create social post → Suggests email marketing campaign
+
 ## 🚀 Quick Start
 
 ```bash
@@ -102,9 +116,32 @@ VITE_WS_URL=ws://localhost:8000
 
 ## 🧪 Testing
 
+### Follow-up System Testing
+
+**Browser Console Testing:**
+```javascript
+// Load test script in browser console
+const script = document.createElement('script');
+script.src = '/test-followup.js';
+document.head.appendChild(script);
+
+// Run integration test
+testAuraFollowUp();
+```
+
+**Manual Testing:**
+1. Complete any task (CMA, Market Report, Social Post)
+2. Wait for follow-up suggestion card to appear
+3. Test accept/dismiss functionality
+4. Verify linked task creation
+
+**Unit Tests:**
 ```bash
 # Run tests (when implemented)
 npm run test
+
+# TypeScript checking
+npm run lint
 ```
 
 ## 📚 Documentation

@@ -35,12 +35,26 @@ function generateMockTranscription(): string {
  * Transcribe audio blob to text using backend API or mock data
  */
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
-  const useRealTranscription = import.meta.env.VITE_USE_REAL_TRANSCRIPTION === 'true';
+  // Check AURA_MOCK_MODE first (new unified system)
+  const auraMockMode = import.meta.env.VITE_AURA_MOCK_MODE === 'true';
+  const legacyMockMode = import.meta.env.VITE_USE_REAL_TRANSCRIPTION !== 'true';
+  const useMock = auraMockMode || legacyMockMode;
   
   // Mock transcription mode (faster, no API required)
-  if (!useRealTranscription) {
-    console.log('[Transcription] Using mock mode');
-    // Simulate API delay for realistic UX
+  if (useMock) {
+    console.log('[Transcription] Using AURA mock mode');
+    
+    // Use new mock system if available
+    if (auraMockMode) {
+      try {
+        const { simulateMockTranscription } = await import('../mocks/transcriptionPrompts');
+        return await simulateMockTranscription();
+      } catch (error) {
+        console.warn('[Transcription] New mock system unavailable, using legacy:', error);
+      }
+    }
+    
+    // Fallback to legacy mock system
     await new Promise(resolve => setTimeout(resolve, 800));
     return generateMockTranscription();
   }
