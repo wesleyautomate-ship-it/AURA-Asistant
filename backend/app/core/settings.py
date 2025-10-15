@@ -16,8 +16,10 @@ BASE_DIR = Path(__file__).parent.parent.parent
 # Database Configuration
 # Use SQLite for local development, PostgreSQL for production
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "sqlite:///./propertypro_dev.db" if os.getenv("ENVIRONMENT", "development") == "development" else "postgresql://admin:password123@localhost:5432/real_estate_db"
+    "DATABASE_URL",
+    "sqlite:///./propertypro_dev.db"
+    if os.getenv("ENVIRONMENT", "development") == "development"
+    else "postgresql://admin:password123@localhost:5432/real_estate_db",
 )
 
 # ChromaDB Configuration
@@ -25,11 +27,14 @@ CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8002"))
 
 # Google AI Configuration
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Support both GEMINI_API_KEY and GOOGLE_API_KEY for backward compatibility
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not GOOGLE_API_KEY:
     # Do not provide any fallback key. In development we warn; in production
     # validation should fail fast via validate_settings().
-    print("⚠️  GOOGLE_API_KEY not set. Some AI features will be disabled until configured.")
+    print(
+        "⚠️  GOOGLE_API_KEY or GEMINI_API_KEY not set. Some AI features will be disabled until configured."
+    )
 
 # Reelly API removed
 
@@ -55,7 +60,11 @@ elif os.getenv("ENVIRONMENT") == "staging":
 else:  # development
     ALLOWED_ORIGINS = [
         "http://localhost:3000",
-        "http://localhost:3001", 
+        "http://localhost:3001",
+        "http://localhost:5173",  # Vite default port
+        "http://localhost:5174",  # Vite alternative port
+        "http://127.0.0.1:5173",  # Vite default with 127.0.0.1
+        "http://127.0.0.1:5174",  # Vite alternative with 127.0.0.1
         "http://192.168.1.241:3001",
         "https://*.ngrok.io",
         "https://*.ngrok-free.app",
@@ -66,7 +75,19 @@ else:  # development
 # File Upload Configuration
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.txt', '.csv', '.xlsx', '.xls'}
+ALLOWED_EXTENSIONS = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".txt",
+    ".csv",
+    ".xlsx",
+    ".xls",
+}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # Cache Configuration
@@ -127,36 +148,60 @@ class Settings:
         self.rate_limit_requests_per_minute = RATE_LIMIT_REQUESTS_PER_MINUTE
         self.rate_limit_login_attempts = RATE_LIMIT_LOGIN_ATTEMPTS
 
+
 def get_settings() -> Settings:
     """Get settings instance for dependency injection"""
     return Settings()
+
 
 # Validation
 def validate_settings():
     """Validate critical settings"""
     required_vars = [
-        "DATABASE_URL", 
-        "CHROMA_HOST", 
-        "CHROMA_PORT", 
+        "DATABASE_URL",
+        "CHROMA_HOST",
+        "CHROMA_PORT",
         "REDIS_URL",
-        "GOOGLE_API_KEY"
+        "GOOGLE_API_KEY",
     ]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
+
     if missing_vars:
         print(f"⚠️  Missing environment variables: {missing_vars}")
         return False
-    
+
     return True
+
 
 # Export settings
 __all__ = [
-    'DATABASE_URL', 'CHROMA_HOST', 'CHROMA_PORT', 'GOOGLE_API_KEY',
-    'AI_MODEL', 'HOST', 'PORT', 'DEBUG', 'ALLOWED_ORIGINS',
-    'UPLOAD_DIR', 'ALLOWED_EXTENSIONS', 'MAX_FILE_SIZE',
-    'REDIS_URL', 'CACHE_TTL', 'LOG_LEVEL', 'LOG_FILE',
-    'MAX_WORKERS', 'BATCH_SIZE', 'SECRET_KEY', 'IS_PRODUCTION',
-    'JWT_ALGORITHM', 'ALGORITHM', 'JWT_REFRESH_TOKEN_EXPIRE_DAYS', 'BCRYPT_ROUNDS',
-    'RATE_LIMIT_REQUESTS_PER_MINUTE', 'RATE_LIMIT_LOGIN_ATTEMPTS',
-    'validate_settings', 'Settings', 'get_settings'
+    "DATABASE_URL",
+    "CHROMA_HOST",
+    "CHROMA_PORT",
+    "GOOGLE_API_KEY",
+    "AI_MODEL",
+    "HOST",
+    "PORT",
+    "DEBUG",
+    "ALLOWED_ORIGINS",
+    "UPLOAD_DIR",
+    "ALLOWED_EXTENSIONS",
+    "MAX_FILE_SIZE",
+    "REDIS_URL",
+    "CACHE_TTL",
+    "LOG_LEVEL",
+    "LOG_FILE",
+    "MAX_WORKERS",
+    "BATCH_SIZE",
+    "SECRET_KEY",
+    "IS_PRODUCTION",
+    "JWT_ALGORITHM",
+    "ALGORITHM",
+    "JWT_REFRESH_TOKEN_EXPIRE_DAYS",
+    "BCRYPT_ROUNDS",
+    "RATE_LIMIT_REQUESTS_PER_MINUTE",
+    "RATE_LIMIT_LOGIN_ATTEMPTS",
+    "validate_settings",
+    "Settings",
+    "get_settings",
 ]

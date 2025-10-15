@@ -38,6 +38,24 @@ BottomNav (mobile), GlobalHeader (search/?K, avatar), Command FAB, Notifications
 **v2.6.9:** Transcription preview toggle, refined Stop/Send flow with 'stopped' phase  
 
 **Features:**
+
+### v3.3.1 - Agentic Chat (Console) Additions
+
+- Added backend chat orchestrator endpoint: `POST /api/v1/intelligence/chat` (SSE)
+- Persist threads/messages in SQLite tables: `chat_threads`, `chat_messages`
+- Frontend route `/chat/console` with 3-pane console, feature-flagged by `VITE_CHAT_CONSOLE_ENABLED`
+- Zustand store `src/store/chatStore.ts` and streaming client `src/services/api/chatApi.ts`
+- Minimal components: Message list, thread list, context panel
+
+Quick test log (manual):
+- Start backend; open `/chat/console`
+- Send: "Summarize our marketing policy" → streaming chunks appear; context panel updates when retrieval available
+- Send: "Create a brochure for listing ID 123" → `tool_invocation` event received with `task_id`
+- New thread + rename verified locally (client-side state)
+
+Changed files (key):
+- Backend: `backend/app/api/v1/intelligence_router.py`, `backend/app/core/models.py`
+- Frontend: `aura-client/src/pages/ChatConsole.tsx`, `aura-client/src/routes/index.tsx`, `aura-client/src/pages/Chat.tsx`, `aura-client/src/store/chatStore.ts`, `aura-client/src/services/api/chatApi.ts`, `aura-client/src/components/chat/*`
 - Voice + text modes with smooth toggle
 - Live waveform (24 bars, 3px width, spring physics)
 - Web Audio API integration with fallback
@@ -107,3 +125,9 @@ Auth, Settings, Global Search (?K), ErrorBoundary/skeletons/toasts, WebSocket cl
 
 ## Summary
 Aura has evolved from concept → **working voice-first AI console** (v2.6.9) for Dubai real estate. The Command Center provides a polished, professional interface ready for backend integration. Next phase focuses on real AI responses, task orchestration, and marketing automation. The UI philosophy remains: "AI creates, agent verifies."
+
+## Phase 3.2 Notes (2025-10-14)
+- Wired the dashboard "Generate Brochure" quick action to the live intelligence pipeline with a streaming modal that keeps the `screenshots/dashboard_baseline.png` and `screenshots/command_center_baseline.png` spacing constants.
+- Added a brochure-specific detail view in the Content Viewer, reusing BottomDock actions and matching the card hierarchy from `screenshots/tasks_baseline.png`.
+- Extended the intelligence API wrapper with `generateBrochure` plus SSE progress logging, then mapped `PROPERTY_BROCHURE` payloads into the intelligence store.
+- Documented the end-to-end flow in `tests/ui_brochure.spec.ts` for manual Playwright verification.

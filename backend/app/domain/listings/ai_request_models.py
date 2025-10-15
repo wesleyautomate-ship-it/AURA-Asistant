@@ -10,7 +10,20 @@ SQLAlchemy models for the new AI request system including:
 - Brand assets management
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON, ARRAY, Date, UUID
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    ForeignKey,
+    DECIMAL,
+    JSON,
+    ARRAY,
+    Date,
+    UUID,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -19,165 +32,211 @@ import uuid
 
 from . import Base
 
+
 class AIRequestNew(Base):
     """AI request processing and management with team-based pipelines"""
+
     __tablename__ = "ai_requests_new"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    brokerage_id = Column(Integer, ForeignKey('brokerages.id'), nullable=False, index=True)
-    
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    brokerage_id = Column(
+        Integer, ForeignKey("brokerages.id"), nullable=False, index=True
+    )
+
     # Request details
-    team = Column(String(50), nullable=False, index=True)  # 'marketing', 'analytics', 'social', 'strategy', 'packages', 'transactions'
+    team = Column(
+        String(50), nullable=False, index=True
+    )  # 'marketing', 'analytics', 'social', 'strategy', 'packages', 'transactions'
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=False)
-    content = Column(Text, nullable=False)  # The actual request content (text or transcript)
-    content_type = Column(String(20), default='text')  # 'text' or 'audio'
-    audio_url = Column(String(500), nullable=True)  # URL to audio file if content_type is 'audio'
-    
+    content = Column(
+        Text, nullable=False
+    )  # The actual request content (text or transcript)
+    content_type = Column(String(20), default="text")  # 'text' or 'audio'
+    audio_url = Column(
+        String(500), nullable=True
+    )  # URL to audio file if content_type is 'audio'
+
     # Template and branding
     template_id = Column(String(100), nullable=True)
     brand_context = Column(JSON, default=dict)
-    
+
     # Status and progress
-    status = Column(String(20), default='queued', index=True)  # 'queued', 'planning', 'generating', 'validating', 'draft_ready', 'needs_info', 'approved', 'delivered', 'failed'
+    status = Column(
+        String(20), default="queued", index=True
+    )  # 'queued', 'planning', 'generating', 'validating', 'draft_ready', 'needs_info', 'approved', 'delivered', 'failed'
     priority = Column(Integer, default=5)  # 1-10 scale, 10 being highest priority
-    
+
     # Timing
     eta = Column(DateTime, nullable=True)  # Estimated time of arrival/completion
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Metadata
     request_metadata_json = Column(JSON, default=dict)
-    
+
     # Relationships
-    user = relationship("User", foreign_keys=[user_id], back_populates="ai_requests_new")
+    user = relationship(
+        "User", foreign_keys=[user_id], back_populates="ai_requests_new"
+    )
     brokerage = relationship("Brokerage", back_populates="ai_requests_new")
-    steps = relationship("AIRequestStep", back_populates="request", cascade="all, delete-orphan")
-    deliverables = relationship("Deliverable", back_populates="request", cascade="all, delete-orphan")
+    steps = relationship(
+        "AIRequestStep", back_populates="request", cascade="all, delete-orphan"
+    )
+    deliverables = relationship(
+        "Deliverable", back_populates="request", cascade="all, delete-orphan"
+    )
+
 
 class AIRequestStep(Base):
     """Individual steps in the AI request pipeline"""
+
     __tablename__ = "ai_request_steps"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    request_id = Column(UUID(as_uuid=True), ForeignKey('ai_requests_new.id'), nullable=False, index=True)
-    
+    request_id = Column(
+        UUID(as_uuid=True), ForeignKey("ai_requests_new.id"), nullable=False, index=True
+    )
+
     # Step details
-    step = Column(String(50), nullable=False)  # 'queued', 'planning', 'generating', 'validating', 'draft_ready'
-    status = Column(String(20), default='pending')  # 'pending', 'in_progress', 'completed', 'failed', 'skipped'
+    step = Column(
+        String(50), nullable=False
+    )  # 'queued', 'planning', 'generating', 'validating', 'draft_ready'
+    status = Column(
+        String(20), default="pending"
+    )  # 'pending', 'in_progress', 'completed', 'failed', 'skipped'
     progress = Column(Integer, default=0)  # 0-100 percentage
-    
+
     # Timing
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     estimated_duration = Column(Integer, nullable=True)  # in seconds
-    
+
     # Results and metadata
     result = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     step_metadata_json = Column(JSON, default=dict)
-    
+
     # Relationships
     request = relationship("AIRequestNew", back_populates="steps")
 
+
 class Deliverable(Base):
     """Deliverables generated by AI requests"""
+
     __tablename__ = "deliverables"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    request_id = Column(UUID(as_uuid=True), ForeignKey('ai_requests_new.id'), nullable=False, index=True)
-    
+    request_id = Column(
+        UUID(as_uuid=True), ForeignKey("ai_requests_new.id"), nullable=False, index=True
+    )
+
     # Deliverable details
-    type = Column(String(20), nullable=False)  # 'pdf', 'image', 'text', 'html', 'zip', 'video'
+    type = Column(
+        String(20), nullable=False
+    )  # 'pdf', 'image', 'text', 'html', 'zip', 'video'
     name = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
-    
+
     # File information
     url = Column(String(1000), nullable=False)  # URL to the actual file
     preview_url = Column(String(1000), nullable=True)  # URL to preview/thumbnail
     file_size = Column(Integer, nullable=True)  # File size in bytes
     mime_type = Column(String(100), nullable=True)
-    
+
     # Status and metadata
-    status = Column(String(20), default='generating')  # 'generating', 'ready', 'failed'
+    status = Column(String(20), default="generating")  # 'generating', 'ready', 'failed'
     deliverable_metadata_json = Column(JSON, default=dict)
-    
+
     # Timing
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     request = relationship("AIRequestNew", back_populates="deliverables")
 
+
 class Template(Base):
     """Templates for different AI teams and request types"""
+
     __tablename__ = "templates"
-    
+
     id = Column(String(100), primary_key=True, index=True)
     team = Column(String(50), nullable=False, index=True)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    
+
     # Template configuration
     prompt_template = Column(Text, nullable=False)
-    output_format = Column(String(20), default='text')  # 'text', 'pdf', 'image', 'html'
+    output_format = Column(String(20), default="text")  # 'text', 'pdf', 'image', 'html'
     estimated_duration = Column(Integer, default=300)  # in seconds
-    
+
     # Metadata
     is_active = Column(Boolean, default=True)
     template_metadata_json = Column(JSON, default=dict)
-    
+
     # Timing
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
+
 class AIBrandAsset(Base):
     """Brand assets for personalization"""
+
     __tablename__ = "ai_brand_assets"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    brokerage_id = Column(Integer, ForeignKey('brokerages.id'), nullable=False, index=True)
-    
+    brokerage_id = Column(
+        Integer, ForeignKey("brokerages.id"), nullable=False, index=True
+    )
+
     # Asset details
-    type = Column(String(50), nullable=False)  # 'logo', 'color_palette', 'font', 'image', 'template'
+    type = Column(
+        String(50), nullable=False
+    )  # 'logo', 'color_palette', 'font', 'image', 'template'
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    
+
     # File information
     url = Column(String(1000), nullable=False)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
-    
+
     # Configuration
     config = Column(JSON, default=dict)  # For color palettes, fonts, etc.
     is_active = Column(Boolean, default=True)
-    
+
     # Timing
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     brokerage = relationship("Brokerage", back_populates="ai_brand_assets")
 
+
 class AIRequestEvent(Base):
     """Events for real-time updates via SSE/WebSocket"""
+
     __tablename__ = "ai_request_events"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    request_id = Column(UUID(as_uuid=True), ForeignKey('ai_requests_new.id'), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    
+    request_id = Column(
+        UUID(as_uuid=True), ForeignKey("ai_requests_new.id"), nullable=False, index=True
+    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
     # Event details
-    event_type = Column(String(50), nullable=False)  # 'step_update', 'progress', 'deliverable_ready', 'eta_update', 'error', 'status_change'
+    event_type = Column(
+        String(50), nullable=False
+    )  # 'step_update', 'progress', 'deliverable_ready', 'eta_update', 'error', 'status_change'
     event_data = Column(JSON, nullable=False)
-    
+
     # Timing
     created_at = Column(DateTime, default=func.now())
-    
+
     # Relationships
     request = relationship("AIRequestNew")
     user = relationship("User", foreign_keys=[user_id])

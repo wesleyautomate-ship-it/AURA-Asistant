@@ -28,6 +28,7 @@ if backend_root_dir not in sys.path:
 # Ensure Alembic uses the same DATABASE_URL as the app settings
 try:
     from app.core.settings import DATABASE_URL
+
     if DATABASE_URL:
         config.set_main_option("sqlalchemy.url", DATABASE_URL)
 except Exception as e:
@@ -96,9 +97,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

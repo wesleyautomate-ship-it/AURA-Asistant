@@ -329,11 +329,17 @@ class EnhancedRAGService:
         if os.getenv("DISABLE_CHROMA", "false").lower() == "true":
             logger.warning("⚠️ ChromaDB disabled via DISABLE_CHROMA environment variable")
             return None
+
+        # Offline guard: skip remote Chroma if CHROMA_HOST is unset/unreachable
+        chroma_host = os.getenv("CHROMA_HOST")
+        if not chroma_host:
+            logger.warning("Chroma disabled (offline mode).")
+            return None
             
         for attempt in range(max_retries):
             try:
                 client = chromadb.HttpClient(
-                    host=os.getenv("CHROMA_HOST", "localhost"),
+                    host=chroma_host,
                     port=int(os.getenv("CHROMA_PORT", "8000"))
                 )
                 # Test connection

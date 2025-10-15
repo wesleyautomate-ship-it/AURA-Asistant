@@ -1,3 +1,66 @@
+## [2025-10-09] - v3.1 AI Content Generation System (Phase 1)
+**Change:** Introduced autonomous AI-powered content generation for CMA reports and investor pitch decks, transforming Aura from task execution to value creation
+**Files:** src/services/templateOrchestrator.ts, src/pages/CMAReport.tsx, src/pages/DeckBuilder.tsx, src/components/ui/ReportPreviewCard.tsx, src/components/ui/SlideCard.tsx, src/services/workflowApi.ts (extended), src/services/orchestrator.ts (enhanced), docs/specs/content_generation/
+**Reasoning:** Enable Aura to autonomously generate professional real estate marketing assets and analytical reports from voice commands, following brand templates and producing export-ready deliverables
+**Details:**
+- Template Orchestrator Service (templateOrchestrator.ts):
+  - Central decision engine mapping intent → template → generation logic
+  - Support for CMA, PITCH_DECK, SOCIAL_POST, and MARKET_REPORT content types
+  - Context-aware content type detection from natural language
+  - Template configurations with brand styling (newsletter_style, investor_deck_style)
+  - Mock content generation with realistic real estate data
+  - Content management with creation IDs and metadata tracking
+  - Structured output with consistent visual hierarchy
+- CMA Generator Frontend (CMAReport.tsx + ReportPreviewCard.tsx):
+  - Full-page professional CMA report viewer with export options
+  - Executive Summary, Market Overview, Comparables Table, Key Insights sections
+  - Professional styling matching newsletter/brochure visual templates
+  - Export functionality for PDF/HTML formats
+  - Share and print capabilities with responsive design
+  - Preview cards in Command Center with compact/full view modes
+  - Status indicators (generating/ready/error) with loading animations
+- Pitch Deck Generator Frontend (DeckBuilder.tsx + SlideCard.tsx):
+  - Interactive slide-based presentation editor with grid/single/presentation modes
+  - 8-slide standard structure: Title, Opportunity, Location, Project, Market, Financial, Timeline, Next Steps
+  - Slide type styling: Title (gradient), Content (white), Data (metrics), Closing (CTA)
+  - Full-screen presentation mode with keyboard navigation (arrow keys, spacebar, escape)
+  - 16:9 aspect ratio optimized for professional presentations
+  - Individual slide cards with smooth Framer Motion animations
+  - Edit mode toggle and slide navigation controls
+- Enhanced Workflow API (workflowApi.ts extended):
+  - generateCMAContent() with comprehensive market analysis payload
+  - generatePitchDeckContent() with structured slide generation
+  - generateMarketReportContent() and generateSocialContent() functions
+  - exportGeneratedContent() for PDF/HTML/JSON/PPTX export
+  - Validation wrapper with context enrichment integration
+  - Mock export URLs for development with graceful fallback
+- Orchestrator Integration (orchestrator.ts enhanced):
+  - Content generation intent detection with keyword analysis
+  - Template Orchestrator routing for "generate", "create", "build", "pitch", "deck"
+  - OrchestrationResult extended with contentGeneration field
+  - Smart routing: content intents → Template Orchestrator, workflows → existing API
+  - Graceful fallback to streaming AI on generation failures
+  - User-friendly success messages with actionable next steps
+- Command Store Extensions (commandStore.ts):
+  - Added CMA_REPORT and PITCH_DECK to RequestType enum
+  - Support for new task types in request tracking and filtering
+  - Generated content accessible through orchestrator proxy methods
+- Content Generation Documentation:
+  - Comprehensive specs in docs/specs/content_generation/
+  - 01_CMA_GENERATOR_SPEC.md: Full CMA system architecture and data flows
+  - 02_PITCH_DECK_SPEC.md: Complete pitch deck generation specification
+  - API integration points, request/response schemas, error handling
+  - Quality assurance scenarios and validation criteria
+  - Future enhancement roadmap for v3.2
+- Brand Consistency Implementation:
+  - Professional color schemes: Blues/grays (CMA), Purple gradients (Pitch Decks)
+  - Typography hierarchy: Large headers, readable body text, emphasized metrics
+  - Layout patterns: Newsletter-style (CMA), Slide-based (Pitch Decks)
+  - Export templates matching uploaded visual identity samples
+  - Consistent component styling with Tailwind CSS classes
+**Outcome:** Aura now autonomously generates complete, professionally formatted CMA reports and investor pitch decks from natural voice/text commands. Users can say "Generate CMA for Downtown Dubai" and receive a full market analysis report with export options. "Create pitch deck for Palm Jumeirah" produces an 8-slide investor presentation with financial projections. All content follows brand templates with consistent visual hierarchy. Export functionality supports PDF/HTML/PPTX formats. Interactive deck builder includes presentation mode with keyboard navigation. Foundation established for expanding to newsletters, brochures, and additional marketing content in v3.2.
+
+---
 ## [2025-10-12] - v2.9.1-debug-fix Stream Lifecycle & Orchestration Stabilization
 **Change:** Fixed critical streaming bugs including undefined refs, infinite Processing state, UI freeze, and missing orchestration integration
 **Files:** src/components/ui/CommandCenter.tsx

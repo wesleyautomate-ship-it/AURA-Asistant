@@ -1,0 +1,5 @@
+﻿
+# Database - Use SQLite for local development
+DATABASE_URL=sqlite:///./propertypro_dev.db
+
+

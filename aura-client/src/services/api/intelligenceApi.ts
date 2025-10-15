@@ -290,6 +290,7 @@ class IntelligenceApiClient {
               // Parse and yield the event
               try {
                 const eventData = JSON.parse(currentData) as ProgressEventData;
+                console.log(`[IntelligenceAPI][SSE] event=${currentEvent} status=${eventData.status} progress=${eventData.progress}`);
                 yield eventData;
                 
                 // Break on completion or failure
@@ -451,6 +452,40 @@ class IntelligenceApiClient {
     }
 
     throw new IntelligenceApiError('Content generation did not complete');
+  }
+
+  /**
+   * Convenience helper for property brochure generation
+   */
+  async generateBrochure(
+    listingId: string,
+    options: {
+      userInput?: string;
+      context?: Record<string, any>;
+      onProgress?: (progress: ProgressEventData) => void;
+    } = {}
+  ): Promise<IntelligenceContent> {
+    if (!listingId) {
+      throw new IntelligenceApiError('listingId is required for brochure generation');
+    }
+
+    const request: ContentGenerationRequest = {
+      user_input: options.userInput || `Generate a property brochure for listing ${listingId}`,
+      content_type: ContentType.PROPERTY_BROCHURE,
+      context: {
+        listing_id: listingId,
+        source: 'dashboard_quick_action',
+        ...options.context
+      }
+    };
+
+    console.log('[IntelligenceAPI] Initiating brochure generation for', listingId);
+
+    return this.generateContentWithProgress(request, (progress) => {
+      if (options.onProgress) {
+        options.onProgress(progress);
+      }
+    });
   }
 
   /**

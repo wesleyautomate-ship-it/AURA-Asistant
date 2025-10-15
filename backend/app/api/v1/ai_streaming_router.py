@@ -18,20 +18,22 @@ router = APIRouter(prefix="/api/v1/ai_request", tags=["AI Streaming"])
 async def ai_response_generator(prompt: str) -> AsyncGenerator[str, None]:
     """
     Generate simulated AI response chunks for SSE streaming
-    
+
     **v2.7.1**: Mock implementation with realistic streaming behavior
     **Future**: Integrate with actual LLM streaming (OpenAI, Anthropic, etc.)
-    
+
     Args:
         prompt: User prompt/command
-        
+
     Yields:
         SSE formatted data chunks
     """
     logger.info(f"Starting AI stream for prompt: '{prompt[:50]}...'")
-    
+
     # Determine response type based on prompt keywords
-    if any(word in prompt.lower() for word in ['cma', 'comparative', 'market', 'analysis']):
+    if any(
+        word in prompt.lower() for word in ["cma", "comparative", "market", "analysis"]
+    ):
         response_parts = [
             "Perfect! I'll create a comprehensive CMA for you.\n\n",
             "📊 **Analyzing Market Data**\n",
@@ -44,9 +46,11 @@ async def ai_response_generator(prompt: str) -> AsyncGenerator[str, None]:
             "• YoY price change: +12.5%\n",
             "• Average DOM: 45 days\n",
             "• Market velocity: Strong buyer demand\n\n",
-            "✅ Your CMA report is being generated and will be ready in your downloads section shortly."
+            "✅ Your CMA report is being generated and will be ready in your downloads section shortly.",
         ]
-    elif any(word in prompt.lower() for word in ['social', 'post', 'listing', 'marketing']):
+    elif any(
+        word in prompt.lower() for word in ["social", "post", "listing", "marketing"]
+    ):
         response_parts = [
             "Great! I'll create engaging marketing content for you.\n\n",
             "✨ **Content Generation**\n",
@@ -58,9 +62,9 @@ async def ai_response_generator(prompt: str) -> AsyncGenerator[str, None]:
             "• Instagram caption ready\n",
             "• Facebook post prepared\n",
             "• LinkedIn version included\n\n",
-            "✅ Your marketing content is ready! Check the deliverables section."
+            "✅ Your marketing content is ready! Check the deliverables section.",
         ]
-    elif any(word in prompt.lower() for word in ['report', 'analysis', 'compare']):
+    elif any(word in prompt.lower() for word in ["report", "analysis", "compare"]):
         response_parts = [
             "I'll prepare a detailed analysis report for you.\n\n",
             "📈 **Data Analysis**\n",
@@ -72,7 +76,7 @@ async def ai_response_generator(prompt: str) -> AsyncGenerator[str, None]:
             "• Market momentum: Positive\n",
             "• Investment potential: High\n",
             "• Rental yield: 6.2% average\n\n",
-            "✅ Report complete! Available in your analytics dashboard."
+            "✅ Report complete! Available in your analytics dashboard.",
         ]
     else:
         # Generic response
@@ -86,28 +90,25 @@ async def ai_response_generator(prompt: str) -> AsyncGenerator[str, None]:
             "💡 **Result**\n",
             "I'm ready to help! Your request has been processed.\n",
             "Let me know if you need any adjustments or additional information.\n\n",
-            "✅ Done!"
+            "✅ Done!",
         ]
-    
+
     # Stream response parts with realistic delays
     for i, part in enumerate(response_parts):
         # Vary delay for realistic feel
         if i == 0:
             await asyncio.sleep(0.8)  # Initial processing
-        elif '✅' in part:
+        elif "✅" in part:
             await asyncio.sleep(0.5)  # Final completion
         else:
             await asyncio.sleep(1.2)  # Normal chunks
-        
+
         # Format as SSE event
-        data = {
-            "content": part,
-            "done": (i == len(response_parts) - 1)
-        }
-        
+        data = {"content": part, "done": (i == len(response_parts) - 1)}
+
         yield f"data: {json.dumps(data)}\n\n"
         logger.debug(f"Streamed chunk {i+1}/{len(response_parts)}")
-    
+
     logger.info("AI stream completed")
 
 
@@ -117,25 +118,25 @@ async def stream_ai_response(
 ):
     """
     Stream AI response using Server-Sent Events (SSE)
-    
+
     **v2.7.1**: Mock streaming with realistic AI-like responses
-    
+
     Args:
         prompt: User command or question
-        
+
     Returns:
         StreamingResponse with text/event-stream media type
     """
     logger.info(f"SSE stream requested for: '{prompt[:50]}...'")
-    
+
     return StreamingResponse(
         ai_response_generator(prompt),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"  # Disable nginx buffering
-        }
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
     )
 
 
@@ -147,5 +148,5 @@ async def ai_streaming_health_check():
         "status": "operational",
         "version": "2.7.1",
         "mode": "mock",
-        "stream_type": "SSE"
+        "stream_type": "SSE",
     }

@@ -9,7 +9,9 @@ from sqlalchemy import create_engine, text
 import os
 
 # Prefer env var, fall back to Alembic .ini default
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@localhost:5432/real_estate_db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://admin:password123@localhost:5432/real_estate_db"
+)
 
 SAMPLE_PROPERTIES = [
     {

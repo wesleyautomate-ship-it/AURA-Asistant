@@ -167,9 +167,26 @@ class ContentIntelligenceService {
       
       // Step 8: Handle fallback to streaming with intelligence enhancements
       if (orchestrationResult.fallbackToStream) {
-        processingLog.push('⚠️ Falling back to enhanced streaming...');
+        processingLog.push('⚠️ Workflow failed, falling back...');
         
-        // Enhance streaming with memory context
+        // Check if this is a true fallback or an error
+        if (orchestrationResult.error) {
+          const errorDetails = orchestrationResult.error;
+          processingLog.push(`❌ Workflow error: ${errorDetails}`);
+          
+          console.error('❌ Workflow failed with error:', errorDetails);
+          console.groupEnd();
+          
+          // Return failure instead of mock success
+          return {
+            success: false,
+            request_id: requestId,
+            error: `Workflow failed: ${errorDetails}`,
+            processing_log: processingLog
+          };
+        }
+        
+        // Only use enhanced streaming for intentional fallbacks
         const streamingResult = await this.enhancedStreamingFallback(
           enhancedPrompt,
           memoryContext,

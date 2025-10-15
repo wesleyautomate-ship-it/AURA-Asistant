@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/v1/clients", tags=["Clients"])
 # Pydantic Schemas
 # ======================
 
+
 class ClientBase(BaseModel):
     name: str = Field(..., max_length=255)
     email: Optional[EmailStr] = None
@@ -73,16 +74,18 @@ class ClientResponse(ClientBase):
 # Routes
 # ======================
 
+
 @router.get("/dev", response_model=List[ClientResponse])
 async def list_clients_dev():
     """Development endpoint to list clients without authentication."""
     import os
+
     if os.getenv("DISABLE_AUTH", "false").lower() != "true":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Development endpoint not available"
+            detail="Development endpoint not available",
         )
-    
+
     # Return sample clients for development
     sample_clients = [
         {
@@ -99,7 +102,11 @@ async def list_clients_dev():
             "assigned_agent_id": 1,
             "relationship_start_date": "2024-12-01",
             "notes": "High-value client interested in luxury properties",
-            "preferences": {"view": "marina", "parking": "2_spaces", "amenities": ["pool", "gym"]}
+            "preferences": {
+                "view": "marina",
+                "parking": "2_spaces",
+                "amenities": ["pool", "gym"],
+            },
         },
         {
             "id": 2,
@@ -115,7 +122,11 @@ async def list_clients_dev():
             "assigned_agent_id": 1,
             "relationship_start_date": "2024-11-15",
             "notes": "First-time buyer, needs guidance",
-            "preferences": {"furnished": True, "floor": "high", "amenities": ["concierge"]}
+            "preferences": {
+                "furnished": True,
+                "floor": "high",
+                "amenities": ["concierge"],
+            },
         },
         {
             "id": 3,
@@ -131,21 +142,27 @@ async def list_clients_dev():
             "assigned_agent_id": 1,
             "relationship_start_date": "2024-10-20",
             "notes": "VIP client looking for ultra-luxury property",
-            "preferences": {"beach_access": True, "pool": "private", "size": "large"}
-        }
+            "preferences": {"beach_access": True, "pool": "private", "size": "large"},
+        },
     ]
-    
+
     return [ClientResponse(**client) for client in sample_clients]
+
 
 @router.get("/", response_model=List[ClientResponse])
 async def list_clients(
     limit: int = 50,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
-        query = db.query(EnhancedClient).order_by(EnhancedClient.id.desc()).offset(offset).limit(limit)
+        query = (
+            db.query(EnhancedClient)
+            .order_by(EnhancedClient.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
         return [ClientResponse.model_validate(obj) for obj in query.all()]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list clients: {str(e)}")
@@ -155,7 +172,7 @@ async def list_clients(
 async def get_client(
     client_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     obj = db.query(EnhancedClient).filter(EnhancedClient.id == client_id).first()
     if not obj:
@@ -163,11 +180,16 @@ async def get_client(
     return ClientResponse.model_validate(obj)
 
 
-@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_agent_or_admin)])
+@router.post(
+    "/",
+    response_model=ClientResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_agent_or_admin)],
+)
 async def create_client(
     payload: ClientCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     try:
         obj = EnhancedClient(
@@ -190,15 +212,21 @@ async def create_client(
         return ClientResponse.model_validate(obj)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create client: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create client: {str(e)}"
+        )
 
 
-@router.put("/{client_id}", response_model=ClientResponse, dependencies=[Depends(require_agent_or_admin)])
+@router.put(
+    "/{client_id}",
+    response_model=ClientResponse,
+    dependencies=[Depends(require_agent_or_admin)],
+)
 async def update_client(
     client_id: int,
     updates: ClientUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     obj = db.query(EnhancedClient).filter(EnhancedClient.id == client_id).first()
     if not obj:
@@ -213,14 +241,20 @@ async def update_client(
         return ClientResponse.model_validate(obj)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to update client: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update client: {str(e)}"
+        )
 
 
-@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_agent_or_admin)])
+@router.delete(
+    "/{client_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_agent_or_admin)],
+)
 async def delete_client(
     client_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     obj = db.query(EnhancedClient).filter(EnhancedClient.id == client_id).first()
     if not obj:
@@ -231,6 +265,6 @@ async def delete_client(
         return None
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete client: {str(e)}")
-
-
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete client: {str(e)}"
+        )

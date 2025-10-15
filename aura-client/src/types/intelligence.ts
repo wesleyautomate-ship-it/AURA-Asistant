@@ -17,6 +17,7 @@ export enum ContentType {
   EMAIL_CAMPAIGN = "EMAIL_CAMPAIGN",
   PROPERTY_DESCRIPTION = "PROPERTY_DESCRIPTION",
   LISTING_STRATEGY = "LISTING_STRATEGY",
+  PROPERTY_BROCHURE = "PROPERTY_BROCHURE",
   GENERAL = "GENERAL"
 }
 
@@ -284,6 +285,7 @@ export const getContentTypeDisplay = (type: ContentType): string => {
     [ContentType.EMAIL_CAMPAIGN]: "Email Campaign",
     [ContentType.PROPERTY_DESCRIPTION]: "Property Description",
     [ContentType.LISTING_STRATEGY]: "Listing Strategy",
+    [ContentType.PROPERTY_BROCHURE]: "Property Brochure",
     [ContentType.GENERAL]: "General Content"
   };
   return displayMap[type] || type;

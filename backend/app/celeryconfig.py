@@ -15,43 +15,43 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Celery Configuration
-broker_url = os.getenv('REDIS_URL', 'redis://redis:6379/0')
-result_backend = os.getenv('REDIS_URL', 'redis://redis:6379/0')
+broker_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+result_backend = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 # Task Configuration
-task_serializer = 'json'
-accept_content = ['json']
-result_serializer = 'json'
-timezone = 'UTC'
+task_serializer = "json"
+accept_content = ["json"]
+result_serializer = "json"
+timezone = "UTC"
 enable_utc = True
 
 # Task Routing
 task_routes = {
-    'tasks.ai_commands.*': {'queue': 'ai_commands'},
-    'tasks.reports.*': {'queue': 'reports'},
-    'tasks.ml_training.*': {'queue': 'ml_training'},
-    'tasks.data_processing.*': {'queue': 'data_processing'},
+    "tasks.ai_commands.*": {"queue": "ai_commands"},
+    "tasks.reports.*": {"queue": "reports"},
+    "tasks.ml_training.*": {"queue": "ml_training"},
+    "tasks.data_processing.*": {"queue": "data_processing"},
 }
 
 # Queue Configuration
-task_default_queue = 'default'
+task_default_queue = "default"
 task_queues = {
-    'default': {},
-    'ai_commands': {
-        'exchange': 'ai_commands',
-        'routing_key': 'ai_commands',
+    "default": {},
+    "ai_commands": {
+        "exchange": "ai_commands",
+        "routing_key": "ai_commands",
     },
-    'reports': {
-        'exchange': 'reports',
-        'routing_key': 'reports',
+    "reports": {
+        "exchange": "reports",
+        "routing_key": "reports",
     },
-    'ml_training': {
-        'exchange': 'ml_training',
-        'routing_key': 'ml_training',
+    "ml_training": {
+        "exchange": "ml_training",
+        "routing_key": "ml_training",
     },
-    'data_processing': {
-        'exchange': 'data_processing',
-        'routing_key': 'data_processing',
+    "data_processing": {
+        "exchange": "data_processing",
+        "routing_key": "data_processing",
     },
 }
 
@@ -78,5 +78,5 @@ task_acks_late = True
 worker_prefetch_multiplier = 1
 
 # Logging
-worker_log_format = '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s'
-worker_task_log_format = '[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s'
+worker_log_format = "[%(asctime)s: %(levelname)s/%(processName)s] %(message)s"
+worker_task_log_format = "[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s"

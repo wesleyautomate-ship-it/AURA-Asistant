@@ -14,8 +14,8 @@ import {
 export type Mode = 'text' | 'voice';
 export type Phase = 'idle' | 'listening' | 'paused' | 'stopped' | 'thinking' | 'responding';
 export type RequestStatus = 'Pending' | 'Processing' | 'Complete' | 'Error';
-export type RequestType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'CMA_REPORT' | 'PITCH_DECK' | 'GENERIC';
-export type ContentType = 'CMA_REPORT' | 'PITCH_DECK' | 'SOCIAL_POST' | 'MARKET_REPORT';
+export type RequestType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'CMA_REPORT' | 'PITCH_DECK' | 'PROPERTY_BROCHURE' | 'GENERIC';
+export type ContentType = 'CMA_REPORT' | 'PITCH_DECK' | 'SOCIAL_POST' | 'MARKET_REPORT' | 'PROPERTY_BROCHURE';
 
 // Intelligence Content v3.3 - Enhanced AI-generated content with memory context
 export interface IntelligenceContent {
@@ -42,6 +42,7 @@ export interface IntelligenceContent {
     processingTime: number;
     confidenceLevel: number;
     sources: string[];
+    listingId?: string;
   };
   exportReady: boolean;
   version: string;

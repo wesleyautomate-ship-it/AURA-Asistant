@@ -14,44 +14,48 @@ from decimal import Decimal
 from app.core.models import User, UserSession, Role, Permission
 from app.core.utils import hash_password
 from app.domain.listings.enhanced_real_estate_models import (
-    EnhancedProperty, EnhancedClient, EnhancedLead, Transaction
+    EnhancedProperty,
+    EnhancedClient,
+    EnhancedLead,
+    Transaction,
 )
 
 logger = logging.getLogger(__name__)
 
+
 def seed_sample_users(db: Session):
     """Seed sample users for development"""
     logger.info("Seeding sample users...")
-    
+
     # Check if users already exist
     if db.query(User).count() > 0:
         logger.info("Users already exist, skipping user seeding")
         return
-    
+
     users_data = [
         {
             "email": "admin@propertypro.ai",
             "password": "Admin123!",
             "first_name": "Admin",
             "last_name": "User",
-            "role": "admin"
+            "role": "admin",
         },
         {
-            "email": "agent@propertypro.ai", 
+            "email": "agent@propertypro.ai",
             "password": "Agent123!",
             "first_name": "John",
             "last_name": "Agent",
-            "role": "agent"
+            "role": "agent",
         },
         {
             "email": "manager@propertypro.ai",
             "password": "Manager123!",
             "first_name": "Sarah",
-            "last_name": "Manager", 
-            "role": "employee"
-        }
+            "last_name": "Manager",
+            "role": "employee",
+        },
     ]
-    
+
     for user_data in users_data:
         user = User(
             email=user_data["email"],
@@ -61,22 +65,23 @@ def seed_sample_users(db: Session):
             role=user_data["role"],
             is_active=True,
             email_verified=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
         db.add(user)
-    
+
     db.commit()
     logger.info(f"Created {len(users_data)} sample users")
+
 
 def seed_sample_properties(db: Session):
     """Seed sample properties for development"""
     logger.info("Seeding sample properties...")
-    
+
     # Check if properties already exist
     if db.query(EnhancedProperty).count() > 0:
         logger.info("Properties already exist, skipping property seeding")
         return
-    
+
     properties_data = [
         {
             "title": "Luxury Downtown Apartment",
@@ -92,25 +97,20 @@ def seed_sample_properties(db: Session):
                 "parking": 1,
                 "balcony": True,
                 "city_view": True,
-                "furnished": True
-            }
+                "furnished": True,
+            },
         },
         {
             "title": "Spacious Family Villa",
             "description": "Beautiful 4BR/3BA villa with private garden and pool in a quiet neighborhood.",
             "price_aed": Decimal("2400000"),
             "location": "Arabian Ranches",
-            "property_type": "Villa", 
+            "property_type": "Villa",
             "bedrooms": 4,
             "bathrooms": 3,
             "area_sqft": Decimal("3200"),
             "listing_status": "available",
-            "features": {
-                "parking": 2,
-                "garden": True,
-                "pool": True,
-                "maid_room": True
-            }
+            "features": {"parking": 2, "garden": True, "pool": True, "maid_room": True},
         },
         {
             "title": "Beachfront Studio",
@@ -122,11 +122,7 @@ def seed_sample_properties(db: Session):
             "bathrooms": 1,
             "area_sqft": Decimal("600"),
             "listing_status": "available",
-            "features": {
-                "beach_access": True,
-                "sea_view": True,
-                "balcony": True
-            }
+            "features": {"beach_access": True, "sea_view": True, "balcony": True},
         },
         {
             "title": "Modern Office Space",
@@ -138,11 +134,7 @@ def seed_sample_properties(db: Session):
             "bathrooms": 2,
             "area_sqft": Decimal("1500"),
             "listing_status": "available",
-            "features": {
-                "parking": 3,
-                "conference_room": True,
-                "reception": True
-            }
+            "features": {"parking": 3, "conference_room": True, "reception": True},
         },
         {
             "title": "Cozy 1BR Apartment",
@@ -154,14 +146,10 @@ def seed_sample_properties(db: Session):
             "bathrooms": 1,
             "area_sqft": Decimal("750"),
             "listing_status": "pending",
-            "features": {
-                "parking": 1,
-                "gym": True,
-                "pool": True
-            }
-        }
+            "features": {"parking": 1, "gym": True, "pool": True},
+        },
     ]
-    
+
     for prop_data in properties_data:
         property_obj = EnhancedProperty(
             title=prop_data["title"],
@@ -176,22 +164,23 @@ def seed_sample_properties(db: Session):
             listing_status=prop_data["listing_status"],
             features=prop_data["features"],
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
         db.add(property_obj)
-    
+
     db.commit()
     logger.info(f"Created {len(properties_data)} sample properties")
+
 
 def seed_sample_clients(db: Session):
     """Seed sample clients for development"""
     logger.info("Seeding sample clients...")
-    
+
     # Check if clients already exist
     if db.query(EnhancedClient).count() > 0:
         logger.info("Clients already exist, skipping client seeding")
         return
-    
+
     clients_data = [
         {
             "name": "Ahmed Al-Rashid",
@@ -202,29 +191,29 @@ def seed_sample_clients(db: Session):
             "budget_max": Decimal("1200000"),
             "preferred_location": "Dubai Marina, Downtown Dubai",
             "requirements": "2-3 bedroom apartment with sea or city view, parking required",
-            "client_status": "active"
+            "client_status": "active",
         },
         {
             "name": "Sarah Johnson",
-            "email": "sarah.johnson@email.com", 
+            "email": "sarah.johnson@email.com",
             "phone": "+971 55 987 6543",
             "client_type": "investor",
             "budget_min": Decimal("800000"),
             "budget_max": Decimal("2000000"),
             "preferred_location": "Business Bay, DIFC",
             "requirements": "Commercial properties or high-ROI residential units",
-            "client_status": "active"
+            "client_status": "active",
         },
         {
             "name": "Mohammed Hassan",
             "email": "mohammed.hassan@email.com",
-            "phone": "+971 50 555 1234", 
+            "phone": "+971 50 555 1234",
             "client_type": "seller",
             "budget_min": Decimal("0"),
             "budget_max": Decimal("0"),
             "preferred_location": "Arabian Ranches",
             "requirements": "Looking to sell 4BR villa, need market analysis",
-            "client_status": "active"
+            "client_status": "active",
         },
         {
             "name": "Emma Wilson",
@@ -235,7 +224,7 @@ def seed_sample_clients(db: Session):
             "budget_max": Decimal("700000"),
             "preferred_location": "JVC, Sports City",
             "requirements": "First-time buyer, studio or 1BR apartment",
-            "client_status": "active"
+            "client_status": "active",
         },
         {
             "name": "David Chen",
@@ -246,10 +235,10 @@ def seed_sample_clients(db: Session):
             "budget_max": Decimal("3500000"),
             "preferred_location": "Emirates Hills, Palm Jumeirah",
             "requirements": "Luxury villa with private pool and garden",
-            "client_status": "active"
-        }
+            "client_status": "active",
+        },
     ]
-    
+
     for client_data in clients_data:
         client = EnhancedClient(
             name=client_data["name"],
@@ -263,25 +252,26 @@ def seed_sample_clients(db: Session):
             client_status=client_data["client_status"],
             relationship_start_date=date.today(),
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            updated_at=datetime.utcnow(),
         )
         db.add(client)
-    
+
     db.commit()
     logger.info(f"Created {len(clients_data)} sample clients")
+
 
 def seed_all_data(db: Session):
     """Seed all sample data for development"""
     logger.info("Starting database seeding for development...")
-    
+
     try:
         seed_sample_users(db)
         seed_sample_properties(db)
         seed_sample_clients(db)
-        
+
         logger.info("Database seeding completed successfully!")
         return True
-        
+
     except Exception as e:
         logger.error(f"Error during database seeding: {e}")
         db.rollback()

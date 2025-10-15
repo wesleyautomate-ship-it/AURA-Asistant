@@ -30,10 +30,27 @@ def upgrade() -> None:
         sa.Column("bedrooms", sa.Integer(), nullable=True),
         sa.Column("bathrooms", sa.Numeric(3, 1), nullable=True),
         sa.Column("area_sqft", sa.Integer(), nullable=True),
-        sa.Column("listing_status", sa.String(20), nullable=False, server_default="draft"),
-        sa.Column("agent_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
-        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column(
+            "listing_status", sa.String(20), nullable=False, server_default="draft"
+        ),
+        sa.Column(
+            "agent_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
     op.create_index("ix_properties_title", "properties", ["title"])
     op.create_index("ix_properties_location", "properties", ["location"])
@@ -45,32 +62,63 @@ def upgrade() -> None:
     op.create_table(
         "listing_history",
         sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
-        sa.Column("property_id", sa.Integer(), sa.ForeignKey("properties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "property_id",
+            sa.Integer(),
+            sa.ForeignKey("properties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("event_type", sa.String(100), nullable=False),
         sa.Column("old_value", sa.Text(), nullable=True),
         sa.Column("new_value", sa.Text(), nullable=True),
-        sa.Column("changed_by_agent_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column(
+            "changed_by_agent_id",
+            sa.Integer(),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
-    op.create_index("ix_listing_history_property_id", "listing_history", ["property_id"])
+    op.create_index(
+        "ix_listing_history_property_id", "listing_history", ["property_id"]
+    )
     op.create_index("ix_listing_history_event_type", "listing_history", ["event_type"])
 
     # property_confidential table
     op.create_table(
         "property_confidential",
         sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
-        sa.Column("property_id", sa.Integer(), sa.ForeignKey("properties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "property_id",
+            sa.Integer(),
+            sa.ForeignKey("properties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("unit_number", sa.String(100), nullable=True),
         sa.Column("plot_number", sa.String(100), nullable=True),
         sa.Column("floor", sa.String(50), nullable=True),
         sa.Column("owner_details", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
-    op.create_index("ix_property_confidential_property_id", "property_confidential", ["property_id"])
+    op.create_index(
+        "ix_property_confidential_property_id", "property_confidential", ["property_id"]
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_property_confidential_property_id", table_name="property_confidential")
+    op.drop_index(
+        "ix_property_confidential_property_id", table_name="property_confidential"
+    )
     op.drop_table("property_confidential")
 
     op.drop_index("ix_listing_history_event_type", table_name="listing_history")

@@ -1,5 +1,6 @@
 import { MessageCircle, Mic, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 export default function Chat() {
   return (
@@ -30,9 +31,16 @@ export default function Chat() {
           <p className="text-gray-600 mb-6 max-w-md mx-auto">
             Voice and text interface with streaming AI responses, quick actions for CMA, market updates, and conversation history.
           </p>
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium">
-            <AlertCircle className="w-4 h-4" />
-            Scheduled for v2.6
+          <div className="flex items-center justify-center gap-3">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium">
+              <AlertCircle className="w-4 h-4" />
+              Scheduled for v2.6
+            </div>
+            {import.meta.env.VITE_CHAT_CONSOLE_ENABLED !== 'false' && (
+              <Link to="/chat/console" className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium">
+                Open Console
+              </Link>
+            )}
           </div>
         </div>
 

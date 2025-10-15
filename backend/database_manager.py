@@ -16,15 +16,25 @@ from config.settings import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
-# Create database engine with connection pooling
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,  # Maximum number of connections in the pool
-    max_overflow=20,  # Maximum number of connections that can be created beyond pool_size
-    pool_pre_ping=True,  # Verify connections before use
-    pool_recycle=3600,  # Recycle connections after 1 hour
-    echo=False  # Set to True for SQL debugging
-)
+# Create database engine with appropriate configuration
+# SQLite doesn't support connection pooling, so we conditionally configure
+if DATABASE_URL.startswith('sqlite'):
+    # SQLite configuration
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,  # Verify connections before use
+        echo=False  # Set to True for SQL debugging
+    )
+else:
+    # PostgreSQL/other databases with connection pooling
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=10,  # Maximum number of connections in the pool
+        max_overflow=20,  # Maximum number of connections that can be created beyond pool_size
+        pool_pre_ping=True,  # Verify connections before use
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        echo=False  # Set to True for SQL debugging
+    )
 
 @contextmanager
 def get_db_connection() -> Generator[Connection, None, None]:

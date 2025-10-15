@@ -31,12 +31,15 @@ def _strip_nullable(value: Optional[str]) -> Optional[str]:
     return value.strip()
 
 
-def _validate_range(min_value: Optional[float], max_value: Optional[float], field_name: str) -> None:
+def _validate_range(
+    min_value: Optional[float], max_value: Optional[float], field_name: str
+) -> None:
     if min_value is not None and max_value is not None and min_value > max_value:
         raise HTTPException(
             status_code=400,
             detail=f"{field_name} minimum cannot be greater than maximum",
         )
+
 
 class PropertySearchRequest(BaseModel):
     min_price: Optional[float] = Field(default=None, ge=0)
@@ -69,6 +72,7 @@ class PropertyUpdate(BaseModel):
     bedrooms: Optional[int] = Field(default=None, ge=0)
     bathrooms: Optional[int] = Field(default=None, ge=0)
     area_sqft: Optional[float] = Field(default=None, gt=0)
+
 
 class PropertyResponse(BaseModel):
     id: int
@@ -115,16 +119,17 @@ def _property_to_response(prop: EnhancedProperty) -> PropertyResponse:
         area_sqft=float(prop.area_sqft) if prop.area_sqft is not None else None,
     )
 
+
 @router.get("/dev", response_model=List[PropertyResponse])
 async def get_all_properties_dev():
     """Development endpoint to list properties without authentication."""
     import os
+
     if os.getenv("DISABLE_AUTH", "false").lower() != "true":
         raise HTTPException(
-            status_code=403,
-            detail="Development endpoint not available"
+            status_code=403, detail="Development endpoint not available"
         )
-    
+
     # Return sample properties for development
     sample_properties = [
         {
@@ -136,7 +141,7 @@ async def get_all_properties_dev():
             "property_type": "Apartment",
             "bedrooms": 3,
             "bathrooms": 3,
-            "area_sqft": 2200.0
+            "area_sqft": 2200.0,
         },
         {
             "id": 2,
@@ -147,7 +152,7 @@ async def get_all_properties_dev():
             "property_type": "Penthouse",
             "bedrooms": 4,
             "bathrooms": 5,
-            "area_sqft": 4500.0
+            "area_sqft": 4500.0,
         },
         {
             "id": 3,
@@ -158,7 +163,7 @@ async def get_all_properties_dev():
             "property_type": "Villa",
             "bedrooms": 6,
             "bathrooms": 7,
-            "area_sqft": 8000.0
+            "area_sqft": 8000.0,
         },
         {
             "id": 4,
@@ -169,7 +174,7 @@ async def get_all_properties_dev():
             "property_type": "Studio",
             "bedrooms": 0,
             "bathrooms": 1,
-            "area_sqft": 650.0
+            "area_sqft": 650.0,
         },
         {
             "id": 5,
@@ -180,16 +185,16 @@ async def get_all_properties_dev():
             "property_type": "Apartment",
             "bedrooms": 2,
             "bathrooms": 2,
-            "area_sqft": 1650.0
-        }
+            "area_sqft": 1650.0,
+        },
     ]
-    
+
     return [PropertyResponse(**prop) for prop in sample_properties]
+
 
 @router.get("/", response_model=List[PropertyResponse])
 async def get_all_properties(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     """Get all properties from the database"""
     try:
@@ -198,10 +203,14 @@ async def get_all_properties(
         return [_property_to_response(prop) for prop in rows]
     except SQLAlchemyError as exc:
         logger.exception("Failed to fetch properties")
-        raise HTTPException(status_code=500, detail="Failed to fetch properties") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch properties"
+        ) from exc
 
 
-@router.post("/", response_model=PropertyResponse, dependencies=[Depends(require_agent_or_admin)])
+@router.post(
+    "/", response_model=PropertyResponse, dependencies=[Depends(require_agent_or_admin)]
+)
 async def create_property(property_data: PropertyCreate, db: Session = Depends(get_db)):
     """Create a new property"""
     try:
@@ -229,7 +238,10 @@ async def create_property(property_data: PropertyCreate, db: Session = Depends(g
     except SQLAlchemyError as exc:
         db.rollback()
         logger.exception("Failed to create property")
-        raise HTTPException(status_code=500, detail="Failed to create property") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to create property"
+        ) from exc
+
 
 @router.get("/search", response_model=PropertySearchResponse)
 async def search_properties(
@@ -243,8 +255,8 @@ async def search_properties(
     max_area_sqft: Optional[float] = Query(None, description="Maximum area in sqft"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Advanced property search with multiple filters and pagination"""
 
@@ -255,26 +267,46 @@ async def search_properties(
         query = select(EnhancedProperty).where(EnhancedProperty.is_deleted.is_(False))
 
         if min_price is not None:
-            query = query.where((EnhancedProperty.price_aed >= min_price) | (EnhancedProperty.price >= min_price))
+            query = query.where(
+                (EnhancedProperty.price_aed >= min_price)
+                | (EnhancedProperty.price >= min_price)
+            )
         if max_price is not None:
-            query = query.where((EnhancedProperty.price_aed <= max_price) | (EnhancedProperty.price <= max_price))
+            query = query.where(
+                (EnhancedProperty.price_aed <= max_price)
+                | (EnhancedProperty.price <= max_price)
+            )
         if bedrooms is not None:
             query = query.where(EnhancedProperty.bedrooms == bedrooms)
         if bathrooms is not None:
             query = query.where(EnhancedProperty.bathrooms == bathrooms)
         if property_type:
-            query = query.where(func.lower(EnhancedProperty.property_type).like(f"%{property_type.lower()}%"))
+            query = query.where(
+                func.lower(EnhancedProperty.property_type).like(
+                    f"%{property_type.lower()}%"
+                )
+            )
         if location:
-            query = query.where(func.lower(EnhancedProperty.location).like(f"%{location.lower()}%"))
+            query = query.where(
+                func.lower(EnhancedProperty.location).like(f"%{location.lower()}%")
+            )
         if min_area_sqft is not None:
             query = query.where(EnhancedProperty.area_sqft >= min_area_sqft)
         if max_area_sqft is not None:
             query = query.where(EnhancedProperty.area_sqft <= max_area_sqft)
 
-        total_count = db.execute(query.with_only_columns(func.count()).order_by(None)).scalar_one()
+        total_count = db.execute(
+            query.with_only_columns(func.count()).order_by(None)
+        ).scalar_one()
 
         offset = (page - 1) * limit
-        rows = db.execute(query.order_by(EnhancedProperty.id.desc()).offset(offset).limit(limit)).scalars().all()
+        rows = (
+            db.execute(
+                query.order_by(EnhancedProperty.id.desc()).offset(offset).limit(limit)
+            )
+            .scalars()
+            .all()
+        )
 
         return PropertySearchResponse(
             properties=[_property_to_response(prop) for prop in rows],
@@ -287,14 +319,19 @@ async def search_properties(
         )
     except SQLAlchemyError as exc:
         logger.exception("Failed to search properties")
-        raise HTTPException(status_code=500, detail="Failed to search properties") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to search properties"
+        ) from exc
+
 
 @router.get("/{property_id}", response_model=PropertyDetailsResponse)
 async def get_property_details(property_id: int, db: Session = Depends(get_db)):
     """Get detailed information about a specific property"""
     try:
         property_obj = db.execute(
-            select(EnhancedProperty).options(joinedload(EnhancedProperty.confidential_details)).where(EnhancedProperty.id == property_id)
+            select(EnhancedProperty)
+            .options(joinedload(EnhancedProperty.confidential_details))
+            .where(EnhancedProperty.id == property_id)
         ).scalar_one_or_none()
 
         if not property_obj or property_obj.is_deleted:
@@ -308,7 +345,9 @@ async def get_property_details(property_id: int, db: Session = Depends(get_db)):
 
         similar_properties: List[PropertyResponse] = []
         if property_obj.property_type:
-            price_column = func.coalesce(EnhancedProperty.price_aed, EnhancedProperty.price)
+            price_column = func.coalesce(
+                EnhancedProperty.price_aed, EnhancedProperty.price
+            )
             similar_query = (
                 select(EnhancedProperty)
                 .where(
@@ -326,7 +365,9 @@ async def get_property_details(property_id: int, db: Session = Depends(get_db)):
             "average_price": price_value * 1.1 if price_value else 0,
             "price_trend": "increasing",
             "days_on_market": 15,
-            "price_per_sqft": price_value / (float(property_obj.area_sqft) or 1000) if price_value else 0,
+            "price_per_sqft": price_value / (float(property_obj.area_sqft) or 1000)
+            if price_value
+            else 0,
         }
 
         neighborhood_info = {
@@ -345,15 +386,22 @@ async def get_property_details(property_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        logger.exception("Failed to fetch property details", extra={"property_id": property_id})
-        raise HTTPException(status_code=500, detail="Failed to fetch property details") from exc
+        logger.exception(
+            "Failed to fetch property details", extra={"property_id": property_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch property details"
+        ) from exc
+
 
 @router.put(
     "/{property_id}",
     response_model=PropertyResponse,
-    dependencies=[Depends(require_agent_or_admin)]
+    dependencies=[Depends(require_agent_or_admin)],
 )
-async def update_property(property_id: int, property_data: PropertyUpdate, db: Session = Depends(get_db)):
+async def update_property(
+    property_id: int, property_data: PropertyUpdate, db: Session = Depends(get_db)
+):
     """Update an existing property"""
     try:
         property_obj = db.get(EnhancedProperty, property_id)
@@ -380,7 +428,10 @@ async def update_property(property_id: int, property_data: PropertyUpdate, db: S
             updated = True
 
         if property_data.property_type is not None:
-            property_obj.property_type = _strip_nullable(property_data.property_type) or property_obj.property_type
+            property_obj.property_type = (
+                _strip_nullable(property_data.property_type)
+                or property_obj.property_type
+            )
             updated = True
 
         if property_data.bedrooms is not None:
@@ -407,13 +458,15 @@ async def update_property(property_id: int, property_data: PropertyUpdate, db: S
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to update property", extra={"property_id": property_id})
-        raise HTTPException(status_code=500, detail="Failed to update property") from exc
+        logger.exception(
+            "Failed to update property", extra={"property_id": property_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to update property"
+        ) from exc
 
-@router.delete(
-    "/{property_id}",
-    dependencies=[Depends(require_agent_or_admin)]
-)
+
+@router.delete("/{property_id}", dependencies=[Depends(require_agent_or_admin)])
 async def delete_property(property_id: int, db: Session = Depends(get_db)):
     """Delete a property"""
     try:
@@ -430,8 +483,13 @@ async def delete_property(property_id: int, db: Session = Depends(get_db)):
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to delete property", extra={"property_id": property_id})
-        raise HTTPException(status_code=500, detail="Failed to delete property") from exc
+        logger.exception(
+            "Failed to delete property", extra={"property_id": property_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete property"
+        ) from exc
+
 
 @router.get("/types/list")
 async def get_property_types(db: Session = Depends(get_db)):
@@ -446,7 +504,10 @@ async def get_property_types(db: Session = Depends(get_db)):
         return {"property_types": rows}
     except SQLAlchemyError as exc:
         logger.exception("Failed to fetch property types")
-        raise HTTPException(status_code=500, detail="Failed to fetch property types") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch property types"
+        ) from exc
+
 
 @router.get("/locations/list")
 async def get_property_locations(db: Session = Depends(get_db)):
@@ -461,20 +522,24 @@ async def get_property_locations(db: Session = Depends(get_db)):
         return {"locations": rows}
     except SQLAlchemyError as exc:
         logger.exception("Failed to fetch property locations")
-        raise HTTPException(status_code=500, detail="Failed to fetch property locations") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch property locations"
+        ) from exc
+
 
 # --- Phase 1: Granular Data & Security Foundation ---
+
 
 @router.put("/{property_id}/status", tags=["Properties"])
 async def update_property_status(
     property_id: int,
     new_status: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Update property listing status with access control"""
     # Check for valid status
-    valid_statuses = ['draft', 'live', 'pocket', 'sold', 'archived']
+    valid_statuses = ["draft", "live", "pocket", "sold", "archived"]
     if new_status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Invalid status provided.")
 
@@ -483,8 +548,13 @@ async def update_property_status(
         if not property_obj or property_obj.is_deleted:
             raise HTTPException(status_code=404, detail="Property not found.")
 
-        if property_obj.agent_id != current_user.id and getattr(current_user, "role", None) != "admin":
-            raise HTTPException(status_code=403, detail="Not authorized to update this property.")
+        if (
+            property_obj.agent_id != current_user.id
+            and getattr(current_user, "role", None) != "admin"
+        ):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to update this property."
+            )
 
         old_status = property_obj.listing_status
         property_obj.listing_status = new_status
@@ -505,14 +575,19 @@ async def update_property_status(
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to update property status", extra={"property_id": property_id})
-        raise HTTPException(status_code=500, detail="Failed to update property status") from exc
+        logger.exception(
+            "Failed to update property status", extra={"property_id": property_id}
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to update property status"
+        ) from exc
+
 
 @router.get("/{property_id}/confidential", tags=["Properties"])
 async def get_confidential_property_data(
     property_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Get confidential property data with access control"""
     try:
@@ -521,14 +596,22 @@ async def get_confidential_property_data(
             raise HTTPException(status_code=404, detail="Property not found.")
 
         user_role = getattr(current_user, "role", None)
-        is_authorized = user_role in ["admin", "manager"] or property_obj.agent_id == current_user.id
+        is_authorized = (
+            user_role in ["admin", "manager"]
+            or property_obj.agent_id == current_user.id
+        )
 
         if not is_authorized:
-            raise HTTPException(status_code=403, detail="You do not have permission to view these details.")
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to view these details.",
+            )
 
         confidential_data = property_obj.confidential_details
         if not confidential_data:
-            raise HTTPException(status_code=404, detail="Confidential data not found for this property.")
+            raise HTTPException(
+                status_code=404, detail="Confidential data not found for this property."
+            )
 
         return {
             "unit_number": confidential_data.unit_number,
@@ -540,5 +623,10 @@ async def get_confidential_property_data(
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        logger.exception("Failed to fetch confidential property data", extra={"property_id": property_id})
-        raise HTTPException(status_code=500, detail="Failed to fetch confidential property data") from exc
+        logger.exception(
+            "Failed to fetch confidential property data",
+            extra={"property_id": property_id},
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch confidential property data"
+        ) from exc

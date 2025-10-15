@@ -23,9 +23,10 @@ def upgrade() -> None:
     # =============================================================================
     # SEED BROKERAGE DATA
     # =============================================================================
-    
+
     # Create sample brokerage
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO brokerages (name, license_number, email, phone, address, website, rera_registered, brand_settings) VALUES 
         (
             'PropertyPro Real Estate',
@@ -43,14 +44,16 @@ def upgrade() -> None:
                 "brand_guidelines": "Professional, modern, Dubai-focused"
             })}'
         )
-    """)
+    """
+    )
 
     # =============================================================================
     # SEED MARKETING TEMPLATES
     # =============================================================================
-    
+
     # Just Listed Postcard Template
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO marketing_templates (name, category, type, description, content_template, design_config, dubai_specific, created_by) VALUES 
         (
             'Dubai Just Listed - Luxury Postcard',
@@ -79,10 +82,12 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # Open House Email Template
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO marketing_templates (name, category, type, description, content_template, design_config, dubai_specific, created_by) VALUES 
         (
             'Dubai Open House - Email Invitation',
@@ -113,10 +118,12 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # Social Media - Just Listed Template
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO marketing_templates (name, category, type, description, content_template, design_config, dubai_specific, created_by) VALUES 
         (
             'Instagram Just Listed - Dubai',
@@ -145,14 +152,16 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # =============================================================================
     # SEED WORKFLOW PACKAGES
     # =============================================================================
-    
+
     # New Listing Package
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO workflow_packages (name, description, category, steps, estimated_duration, is_template, created_by) VALUES 
         (
             'New Listing Package',
@@ -207,10 +216,12 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # Lead Nurturing Package
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO workflow_packages (name, description, category, steps, estimated_duration, is_template, created_by) VALUES 
         (
             'Lead Nurturing Package',
@@ -257,10 +268,12 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # Client Onboarding Package
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO workflow_packages (name, description, category, steps, estimated_duration, is_template, created_by) VALUES 
         (
             'Client Onboarding Package',
@@ -305,12 +318,13 @@ def upgrade() -> None:
             true,
             1
         )
-    """)
+    """
+    )
 
     # =============================================================================
     # SEED DUBAI MARKET DATA
     # =============================================================================
-    
+
     # Current market snapshots for major Dubai areas
     dubai_areas = [
         {
@@ -321,29 +335,29 @@ def upgrade() -> None:
                 "total_inventory": 450,
                 "sales_this_month": 23,
                 "avg_days_on_market": 45,
-                "price_trend": "stable"
+                "price_trend": "stable",
             },
             "trend_analysis": {
                 "yoy_growth": "5.2%",
                 "market_velocity": "moderate",
-                "buyer_profile": "international_investors"
-            }
+                "buyer_profile": "international_investors",
+            },
         },
         {
             "area": "Downtown Dubai",
-            "property_type": "apartment", 
+            "property_type": "apartment",
             "metrics": {
                 "avg_price_per_sqft": 1500,
                 "total_inventory": 320,
                 "sales_this_month": 31,
                 "avg_days_on_market": 38,
-                "price_trend": "increasing"
+                "price_trend": "increasing",
             },
             "trend_analysis": {
                 "yoy_growth": "8.7%",
                 "market_velocity": "high",
-                "buyer_profile": "luxury_seekers"
-            }
+                "buyer_profile": "luxury_seekers",
+            },
         },
         {
             "area": "Palm Jumeirah",
@@ -353,13 +367,13 @@ def upgrade() -> None:
                 "total_inventory": 85,
                 "sales_this_month": 12,
                 "avg_days_on_market": 62,
-                "price_trend": "increasing"
+                "price_trend": "increasing",
             },
             "trend_analysis": {
                 "yoy_growth": "12.3%",
                 "market_velocity": "low",
-                "buyer_profile": "ultra_high_net_worth"
-            }
+                "buyer_profile": "ultra_high_net_worth",
+            },
         },
         {
             "area": "Business Bay",
@@ -369,13 +383,13 @@ def upgrade() -> None:
                 "total_inventory": 680,
                 "sales_this_month": 45,
                 "avg_days_on_market": 52,
-                "price_trend": "stable"
+                "price_trend": "stable",
             },
             "trend_analysis": {
                 "yoy_growth": "3.1%",
                 "market_velocity": "moderate",
-                "buyer_profile": "young_professionals"
-            }
+                "buyer_profile": "young_professionals",
+            },
         },
         {
             "area": "Jumeirah Beach Residence",
@@ -385,19 +399,20 @@ def upgrade() -> None:
                 "total_inventory": 280,
                 "sales_this_month": 19,
                 "avg_days_on_market": 41,
-                "price_trend": "increasing"
+                "price_trend": "increasing",
             },
             "trend_analysis": {
                 "yoy_growth": "6.8%",
                 "market_velocity": "moderate_high",
-                "buyer_profile": "lifestyle_buyers"
-            }
-        }
+                "buyer_profile": "lifestyle_buyers",
+            },
+        },
     ]
-    
+
     today = date.today()
     for area_data in dubai_areas:
-        op.execute(f"""
+        op.execute(
+            f"""
             INSERT INTO market_snapshots (area, snapshot_date, property_type, metrics, trend_analysis, data_source) VALUES 
             (
                 '{area_data["area"]}',
@@ -407,14 +422,16 @@ def upgrade() -> None:
                 '{json.dumps(area_data["trend_analysis"])}',
                 'propertypro_analytics'
             )
-        """)
+        """
+        )
 
     # =============================================================================
     # SEED COMMUNICATION TEMPLATES
     # =============================================================================
-    
+
     # Inspection Scheduled Email
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO communication_templates (name, category, trigger_event, subject, content, variables, created_by) VALUES 
         (
             'Inspection Scheduled - Client Notification',
@@ -460,10 +477,12 @@ RERA License: {{brokerage_license}}',
             ])}',
             1
         )
-    """)
+    """
+    )
 
     # Offer Received SMS
-    op.execute(f"""
+    op.execute(
+        f"""
         INSERT INTO communication_templates (name, category, trigger_event, content, variables, created_by) VALUES 
         (
             'Offer Received - Seller Alert',
@@ -476,13 +495,16 @@ RERA License: {{brokerage_license}}',
             ])}',
             1
         )
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
     # Clear seeded data (in reverse order of creation)
     op.execute("DELETE FROM communication_templates WHERE created_by = 1")
-    op.execute("DELETE FROM market_snapshots WHERE data_source = 'propertypro_analytics'")
+    op.execute(
+        "DELETE FROM market_snapshots WHERE data_source = 'propertypro_analytics'"
+    )
     op.execute("DELETE FROM workflow_packages WHERE created_by = 1")
     op.execute("DELETE FROM marketing_templates WHERE created_by = 1")
     op.execute("DELETE FROM brokerages WHERE name = 'PropertyPro Real Estate'")

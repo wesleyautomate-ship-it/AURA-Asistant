@@ -37,8 +37,10 @@ rag_service = EnhancedRAGService()
 # Store generated reports in memory (in production, use database)
 generated_reports = {}
 
+
 class ReportRequest(BaseModel):
     """Base model for report generation requests"""
+
     report_type: str
     title: str
     description: str
@@ -46,8 +48,10 @@ class ReportRequest(BaseModel):
     user_id: Optional[str] = None
     session_id: Optional[str] = None
 
+
 class MarketReportRequest(BaseModel):
     """Request model for market report generation"""
+
     area: str
     property_type: str
     time_period: str
@@ -56,8 +60,10 @@ class MarketReportRequest(BaseModel):
     include_charts: bool = True
     include_comparisons: bool = True
 
+
 class CMAReportRequest(BaseModel):
     """Request model for CMA report generation"""
+
     property_address: str
     property_type: str
     bedrooms: int
@@ -66,23 +72,29 @@ class CMAReportRequest(BaseModel):
     current_price: Optional[float] = None
     comparable_count: int = 5
 
+
 class ListingPresentationRequest(BaseModel):
     """Request model for listing presentation generation"""
+
     property_id: Optional[str] = None
     property_details: Dict[str, Any]
     presentation_type: str = "standard"  # "standard", "luxury", "investment"
     include_market_data: bool = True
     include_comparables: bool = True
 
+
 class TermsConditionsRequest(BaseModel):
     """Request model for terms & conditions generation"""
+
     deal_type: str  # "sale", "rent", "investment"
     property_type: str
     client_type: str  # "buyer", "seller", "tenant", "landlord"
     special_terms: Optional[List[str]] = None
 
+
 class ReportResponse(BaseModel):
     """Response model for report generation"""
+
     report_id: str
     title: str
     report_type: str
@@ -91,8 +103,10 @@ class ReportResponse(BaseModel):
     status: str
     preview: str
 
+
 class ReportDetailResponse(BaseModel):
     """Detailed report response"""
+
     report_id: str
     title: str
     report_type: str
@@ -102,17 +116,19 @@ class ReportDetailResponse(BaseModel):
     parameters: Dict[str, Any]
     metadata: Dict[str, Any]
 
+
 def get_database_connection():
     """Get database connection"""
     engine = create_engine(DATABASE_URL)
     return engine
 
+
 def generate_web_page_content(report_data: Dict[str, Any]) -> str:
     """Generate HTML content for the report web page"""
-    
+
     # Dubai skyline image URL (generic)
     dubai_skyline_url = "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&h=400&fit=crop"
-    
+
     html_template = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -331,20 +347,22 @@ def generate_web_page_content(report_data: Dict[str, Any]) -> str:
 </body>
 </html>
     """
-    
+
     return html_template
+
 
 @router.post("/market-report", response_model=ReportResponse)
 async def generate_market_report(request: MarketReportRequest):
     """Generate a comprehensive market report for a specific area"""
     try:
         report_id = str(uuid.uuid4())
-        
+
         # Get market data from database
         engine = get_database_connection()
         with engine.connect() as conn:
             # Get market statistics
-            market_query = text("""
+            market_query = text(
+                """
                 SELECT 
                     AVG(price) as avg_price,
                     COUNT(*) as total_properties,
@@ -355,10 +373,12 @@ async def generate_market_report(request: MarketReportRequest):
                 WHERE location ILIKE :area 
                 AND property_type ILIKE :property_type
                 AND listing_status = 'live'
-            """)
-            
+            """
+            )
+
             if request.bedrooms:
-                market_query = text("""
+                market_query = text(
+                    """
                     SELECT 
                         AVG(price) as avg_price,
                         COUNT(*) as total_properties,
@@ -370,30 +390,38 @@ async def generate_market_report(request: MarketReportRequest):
                     AND property_type ILIKE :property_type
                     AND bedrooms = :bedrooms
                     AND listing_status = 'live'
-                """)
-            
-            result = conn.execute(market_query, {
-                "area": f"%{request.area}%",
-                "property_type": f"%{request.property_type}%",
-                "bedrooms": request.bedrooms
-            }).fetchone()
-            
+                """
+                )
+
+            result = conn.execute(
+                market_query,
+                {
+                    "area": f"%{request.area}%",
+                    "property_type": f"%{request.property_type}%",
+                    "bedrooms": request.bedrooms,
+                },
+            ).fetchone()
+
             market_data = {
                 "avg_price": float(result.avg_price) if result.avg_price else 0,
-                "total_properties": int(result.total_properties) if result.total_properties else 0,
-                "avg_price_per_sqft": float(result.avg_price_per_sqft) if result.avg_price_per_sqft else 0,
+                "total_properties": int(result.total_properties)
+                if result.total_properties
+                else 0,
+                "avg_price_per_sqft": float(result.avg_price_per_sqft)
+                if result.avg_price_per_sqft
+                else 0,
                 "min_price": float(result.min_price) if result.min_price else 0,
-                "max_price": float(result.max_price) if result.max_price else 0
+                "max_price": float(result.max_price) if result.max_price else 0,
             }
-        
+
         # Generate report content using AI
         report_content = ai_manager.generate_market_report(
             neighborhood=request.area,
             property_type=request.property_type,
             time_period=request.time_period,
-            market_data=market_data
+            market_data=market_data,
         )
-        
+
         # Create report data
         report_data = {
             "report_id": report_id,
@@ -407,16 +435,16 @@ async def generate_market_report(request: MarketReportRequest):
                 "property_type": request.property_type,
                 "time_period": request.time_period,
                 "bedrooms": request.bedrooms,
-                "transaction_type": request.transaction_type
-            }
+                "transaction_type": request.transaction_type,
+            },
         }
-        
+
         # Store report
         generated_reports[report_id] = report_data
-        
+
         # Generate web URL
         web_url = f"/reports/view/{report_id}"
-        
+
         return ReportResponse(
             report_id=report_id,
             title=report_data["title"],
@@ -424,23 +452,29 @@ async def generate_market_report(request: MarketReportRequest):
             web_url=web_url,
             generated_date=datetime.now(),
             status="completed",
-            preview=report_content[:200] + "..." if len(report_content) > 200 else report_content
+            preview=report_content[:200] + "..."
+            if len(report_content) > 200
+            else report_content,
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating market report: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate market report: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate market report: {str(e)}"
+        )
+
 
 @router.post("/cma-report", response_model=ReportResponse)
 async def generate_cma_report(request: CMAReportRequest):
     """Generate a Comparative Market Analysis report"""
     try:
         report_id = str(uuid.uuid4())
-        
+
         # Get comparable properties from database
         engine = get_database_connection()
         with engine.connect() as conn:
-            comps_query = text("""
+            comps_query = text(
+                """
                 SELECT 
                     title, price, bedrooms, bathrooms, area_sqft, location,
                     price_per_sqft, listing_status
@@ -452,31 +486,39 @@ async def generate_cma_report(request: CMAReportRequest):
                 AND listing_status = 'live'
                 ORDER BY ABS(area_sqft - :target_size)
                 LIMIT :limit
-            """)
-            
+            """
+            )
+
             size_variance = request.size_sqft * 0.2  # 20% variance
-            result = conn.execute(comps_query, {
-                "property_type": f"%{request.property_type}%",
-                "bedrooms": request.bedrooms,
-                "bathrooms": request.bathrooms,
-                "min_size": request.size_sqft - size_variance,
-                "max_size": request.size_sqft + size_variance,
-                "target_size": request.size_sqft,
-                "limit": request.comparable_count
-            })
-            
+            result = conn.execute(
+                comps_query,
+                {
+                    "property_type": f"%{request.property_type}%",
+                    "bedrooms": request.bedrooms,
+                    "bathrooms": request.bathrooms,
+                    "min_size": request.size_sqft - size_variance,
+                    "max_size": request.size_sqft + size_variance,
+                    "target_size": request.size_sqft,
+                    "limit": request.comparable_count,
+                },
+            )
+
             comparable_properties = []
             for row in result:
-                comparable_properties.append({
-                    "title": row.title,
-                    "price": float(row.price) if row.price else 0,
-                    "bedrooms": int(row.bedrooms) if row.bedrooms else 0,
-                    "bathrooms": int(row.bathrooms) if row.bathrooms else 0,
-                    "area_sqft": float(row.area_sqft) if row.area_sqft else 0,
-                    "location": row.location,
-                    "price_per_sqft": float(row.price_per_sqft) if row.price_per_sqft else 0
-                })
-        
+                comparable_properties.append(
+                    {
+                        "title": row.title,
+                        "price": float(row.price) if row.price else 0,
+                        "bedrooms": int(row.bedrooms) if row.bedrooms else 0,
+                        "bathrooms": int(row.bathrooms) if row.bathrooms else 0,
+                        "area_sqft": float(row.area_sqft) if row.area_sqft else 0,
+                        "location": row.location,
+                        "price_per_sqft": float(row.price_per_sqft)
+                        if row.price_per_sqft
+                        else 0,
+                    }
+                )
+
         # Generate CMA content using AI
         subject_property = {
             "address": request.property_address,
@@ -484,11 +526,13 @@ async def generate_cma_report(request: CMAReportRequest):
             "bedrooms": request.bedrooms,
             "bathrooms": request.bathrooms,
             "size_sqft": request.size_sqft,
-            "current_price": request.current_price
+            "current_price": request.current_price,
         }
-        
-        cma_content = ai_manager.generate_cma_content(subject_property, comparable_properties)
-        
+
+        cma_content = ai_manager.generate_cma_content(
+            subject_property, comparable_properties
+        )
+
         # Create report data
         report_data = {
             "report_id": report_id,
@@ -503,16 +547,16 @@ async def generate_cma_report(request: CMAReportRequest):
                 "bedrooms": request.bedrooms,
                 "bathrooms": request.bathrooms,
                 "size_sqft": request.size_sqft,
-                "comparable_count": len(comparable_properties)
-            }
+                "comparable_count": len(comparable_properties),
+            },
         }
-        
+
         # Store report
         generated_reports[report_id] = report_data
-        
+
         # Generate web URL
         web_url = f"/reports/view/{report_id}"
-        
+
         return ReportResponse(
             report_id=report_id,
             title=report_data["title"],
@@ -520,22 +564,27 @@ async def generate_cma_report(request: CMAReportRequest):
             web_url=web_url,
             generated_date=datetime.now(),
             status="completed",
-            preview=cma_content[:200] + "..." if len(cma_content) > 200 else cma_content
+            preview=cma_content[:200] + "..."
+            if len(cma_content) > 200
+            else cma_content,
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating CMA report: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate CMA report: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate CMA report: {str(e)}"
+        )
+
 
 @router.post("/listing-presentation", response_model=ReportResponse)
 async def generate_listing_presentation(request: ListingPresentationRequest):
     """Generate a listing presentation"""
     try:
         report_id = str(uuid.uuid4())
-        
+
         # Generate property brochure content using AI
         brochure_content = ai_manager.build_property_brochure(request.property_details)
-        
+
         # Create report data
         report_data = {
             "report_id": report_id,
@@ -548,16 +597,16 @@ async def generate_listing_presentation(request: ListingPresentationRequest):
                 "property_id": request.property_id,
                 "presentation_type": request.presentation_type,
                 "include_market_data": request.include_market_data,
-                "include_comparables": request.include_comparables
-            }
+                "include_comparables": request.include_comparables,
+            },
         }
-        
+
         # Store report
         generated_reports[report_id] = report_data
-        
+
         # Generate web URL
         web_url = f"/reports/view/{report_id}"
-        
+
         return ReportResponse(
             report_id=report_id,
             title=report_data["title"],
@@ -565,19 +614,24 @@ async def generate_listing_presentation(request: ListingPresentationRequest):
             web_url=web_url,
             generated_date=datetime.now(),
             status="completed",
-            preview=brochure_content[:200] + "..." if len(brochure_content) > 200 else brochure_content
+            preview=brochure_content[:200] + "..."
+            if len(brochure_content) > 200
+            else brochure_content,
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating listing presentation: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate listing presentation: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate listing presentation: {str(e)}"
+        )
+
 
 @router.post("/terms-conditions", response_model=ReportResponse)
 async def generate_terms_conditions(request: TermsConditionsRequest):
     """Generate terms and conditions for a deal"""
     try:
         report_id = str(uuid.uuid4())
-        
+
         # Create terms and conditions content
         terms_content = f"""
 # Terms and Conditions - {request.deal_type.title()} Agreement
@@ -625,7 +679,7 @@ Both parties must sign this agreement for it to be legally binding.
 *Generated on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}*
 *Dubai Real Estate RAG System*
         """
-        
+
         # Create report data
         report_data = {
             "report_id": report_id,
@@ -638,16 +692,18 @@ Both parties must sign this agreement for it to be legally binding.
                 "deal_type": request.deal_type,
                 "property_type": request.property_type,
                 "client_type": request.client_type,
-                "special_terms_count": len(request.special_terms) if request.special_terms else 0
-            }
+                "special_terms_count": len(request.special_terms)
+                if request.special_terms
+                else 0,
+            },
         }
-        
+
         # Store report
         generated_reports[report_id] = report_data
-        
+
         # Generate web URL
         web_url = f"/reports/view/{report_id}"
-        
+
         return ReportResponse(
             report_id=report_id,
             title=report_data["title"],
@@ -655,12 +711,17 @@ Both parties must sign this agreement for it to be legally binding.
             web_url=web_url,
             generated_date=datetime.now(),
             status="completed",
-            preview=terms_content[:200] + "..." if len(terms_content) > 200 else terms_content
+            preview=terms_content[:200] + "..."
+            if len(terms_content) > 200
+            else terms_content,
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating terms and conditions: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate terms and conditions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate terms and conditions: {str(e)}"
+        )
+
 
 @router.get("/view/{report_id}", response_class=HTMLResponse)
 async def view_report(report_id: str):
@@ -668,15 +729,16 @@ async def view_report(report_id: str):
     try:
         if report_id not in generated_reports:
             raise HTTPException(status_code=404, detail="Report not found")
-        
+
         report_data = generated_reports[report_id]
         html_content = generate_web_page_content(report_data)
-        
+
         return HTMLResponse(content=html_content)
-        
+
     except Exception as e:
         logger.error(f"Error viewing report: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to view report: {str(e)}")
+
 
 @router.get("/{report_id}", response_model=ReportDetailResponse)
 async def get_report_details(report_id: str):
@@ -684,9 +746,9 @@ async def get_report_details(report_id: str):
     try:
         if report_id not in generated_reports:
             raise HTTPException(status_code=404, detail="Report not found")
-        
+
         report_data = generated_reports[report_id]
-        
+
         return ReportDetailResponse(
             report_id=report_data["report_id"],
             title=report_data["title"],
@@ -695,12 +757,15 @@ async def get_report_details(report_id: str):
             web_url=f"/reports/view/{report_id}",
             generated_date=datetime.now(),
             parameters=report_data["parameters"],
-            metadata=report_data["metadata"]
+            metadata=report_data["metadata"],
         )
-        
+
     except Exception as e:
         logger.error(f"Error getting report details: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get report details: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get report details: {str(e)}"
+        )
+
 
 @router.get("/", response_model=List[ReportResponse])
 async def list_reports():
@@ -708,21 +773,26 @@ async def list_reports():
     try:
         reports = []
         for report_id, report_data in generated_reports.items():
-            reports.append(ReportResponse(
-                report_id=report_data["report_id"],
-                title=report_data["title"],
-                report_type=report_data["report_type"],
-                web_url=f"/reports/view/{report_id}",
-                generated_date=datetime.now(),
-                status="completed",
-                preview=report_data["content"][:200] + "..." if len(report_data["content"]) > 200 else report_data["content"]
-            ))
-        
+            reports.append(
+                ReportResponse(
+                    report_id=report_data["report_id"],
+                    title=report_data["title"],
+                    report_type=report_data["report_type"],
+                    web_url=f"/reports/view/{report_id}",
+                    generated_date=datetime.now(),
+                    status="completed",
+                    preview=report_data["content"][:200] + "..."
+                    if len(report_data["content"]) > 200
+                    else report_data["content"],
+                )
+            )
+
         return reports
-        
+
     except Exception as e:
         logger.error(f"Error listing reports: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
+
 
 @router.delete("/{report_id}")
 async def delete_report(report_id: str):
@@ -730,11 +800,13 @@ async def delete_report(report_id: str):
     try:
         if report_id not in generated_reports:
             raise HTTPException(status_code=404, detail="Report not found")
-        
+
         del generated_reports[report_id]
-        
+
         return {"message": "Report deleted successfully"}
-        
+
     except Exception as e:
         logger.error(f"Error deleting report: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete report: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete report: {str(e)}"
+        )

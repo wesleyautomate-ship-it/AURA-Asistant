@@ -1,8 +1,8 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+﻿import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSwipeable } from 'react-swipeable';
-import { Link } from 'react-router-dom';
-import { useCommandStore } from '../store/commandStore';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCommandStore, type IntelligenceContent as StoreIntelligenceContent } from '../store/commandStore';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -13,9 +13,23 @@ import {
   ChevronRight as CardChevron,
   Zap,
   Activity,
-  TrendingUp
+  TrendingUp,
+  Loader2,
+  FileText,
+  BarChart3,
+  MapPin,
+  Bed,
+  Bath,
+  Ruler
 } from 'lucide-react';
 import { type KpiMetric } from '../services/mockData';
+import RefineModal from '../components/RefineModal';
+import { ProgressTracker, type ProgressStep } from '../components/ui/ProgressTracker';
+import { intelligenceApi, IntelligenceApiError } from '../services/api/intelligenceApi';
+import { TaskStatus, type ProgressEventData } from '../types/intelligence';
+import { mapApiIntelligenceContent } from '../utils/intelligenceContent';
+import { parseBrochureStructuredData, formatBedrooms, formatBathrooms, formatSqft, type BrochureStructuredData } from '../utils/brochure';
+import { pickRandomSeededListing, type SeededListing } from '../data/seededListings';
 
 interface Slide {
   title: string;
@@ -65,7 +79,7 @@ const getSlides = (metrics: KpiMetric[]): Slide[] => [
     render: (
       <section className="mt-4 space-y-3">
         <ul className="text-gray-700 text-sm sm:text-base list-disc pl-5 space-y-1">
-          <li>{metrics[0].value > 5 ? 'AI tasks increasing — great activity!' : metrics[0].value > 0 ? 'Some task activity today.' : 'No tasks yet — start creating!'}</li>
+          <li>{metrics[0].value > 5 ? 'AI tasks increasing â€” great activity!' : metrics[0].value > 0 ? 'Some task activity today.' : 'No tasks yet â€” start creating!'}</li>
           <li>{metrics[1].value > 3 ? 'AI requests processing well.' : 'AI activity stable.'}</li>
           <li>Success rate at {metrics[2].value}% ({metrics[2].delta.startsWith('+') ? '+' : ''}{metrics[2].delta}% change).</li>
         </ul>
@@ -118,7 +132,7 @@ const getSlides = (metrics: KpiMetric[]): Slide[] => [
                     deltaNum >= 0 ? 'text-green-600' : 'text-red-500'
                   }`}
                 >
-                  {deltaNum >= 0 ? <TrendingUp className="w-3 h-3" /> : '▼'}
+                  {deltaNum >= 0 ? <TrendingUp className="w-3 h-3" /> : 'â–¼'}
                   {deltaNum >= 0 ? '+' : ''}{m.delta}%
                 </motion.span>
               </div>
@@ -130,8 +144,62 @@ const getSlides = (metrics: KpiMetric[]): Slide[] => [
   },
 ];
 
+type BrochureStepId = 'init' | 'property_lookup' | 'prompt_build' | 'generating' | 'formatting' | 'completed';
+
+const BROCHURE_STEP_PROGRESS: Record<BrochureStepId, number> = {
+  init: 5,
+  property_lookup: 20,
+  prompt_build: 40,
+  generating: 70,
+  formatting: 90,
+  completed: 100,
+};
+
+const BROCHURE_PROGRESS_STEPS: ProgressStep[] = [
+  { id: 'init', label: 'Initializing', description: 'Preparing brochure workflow', percentage: 5 },
+  { id: 'property_lookup', label: 'Property Lookup', description: 'Finding the right listing', percentage: 20 },
+  { id: 'prompt_build', label: 'Prompt Build', description: 'Gathering listing insights', percentage: 40 },
+  { id: 'generating', label: 'Generating', description: 'Crafting brochure narrative', percentage: 70 },
+  { id: 'formatting', label: 'Formatting', description: 'Polishing presentation', percentage: 90 },
+  { id: 'completed', label: 'Ready', description: 'Brochure ready to review', percentage: 100 },
+];
+
+const normalizeBrochureStep = (event: ProgressEventData): BrochureStepId => {
+  const rawStep = (event.current_step || event.status || 'generating').toString().toLowerCase();
+
+  if (rawStep.includes('lookup')) return 'property_lookup';
+  if (rawStep.includes('prompt')) return 'prompt_build';
+  if (rawStep.includes('format')) return 'formatting';
+  if (rawStep.includes('init') || rawStep.includes('queue')) return 'init';
+  if (rawStep.includes('complete')) return 'completed';
+  if (rawStep.includes('generate')) return 'generating';
+
+  return 'generating';
+};
+
+const clampProgress = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return Math.round(value);
+};
+
+const mapStepToProgress = (step: BrochureStepId, fallback?: number): number => {
+  if (typeof fallback === 'number' && Number.isFinite(fallback)) {
+    return clampProgress(fallback);
+  }
+  return BROCHURE_STEP_PROGRESS[step];
+};
+
 export default function Dashboard() {
-  const { requests } = useCommandStore();
+  const navigate = useNavigate();
+  const {
+    requests,
+    addRequest,
+    updateRequestStatus,
+    updateRequestProgress,
+    saveIntelligenceContent
+  } = useCommandStore();
   
   // Generate real metrics from task data
   const generateRealMetrics = (): KpiMetric[] => {
@@ -178,11 +246,163 @@ export default function Dashboard() {
   
   const [metrics, setMetrics] = useState<KpiMetric[]>(generateRealMetrics);
 
+  const [brochureStatus, setBrochureStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [brochureProgress, setBrochureProgress] = useState(0);
+  const [brochureStep, setBrochureStep] = useState<BrochureStepId>('init');
+  const [brochureError, setBrochureError] = useState<string | null>(null);
+  const [brochureListing, setBrochureListing] = useState<SeededListing | null>(null);
+  const [brochureContent, setBrochureContent] = useState<StoreIntelligenceContent | null>(null);
+  const [isBrochureModalOpen, setIsBrochureModalOpen] = useState(false);
+  const brochureStructured = useMemo(() => {
+    if (!brochureContent) {
+      return null;
+    }
+    return parseBrochureStructuredData(
+      (brochureContent.generatedContent?.structured as Record<string, unknown> | undefined) || {}
+    );
+  }, [brochureContent]);
+
+  const isBrochureProcessing = brochureStatus === 'processing';
+
+  const handleCloseBrochureModal = useCallback(() => {
+    if (brochureStatus === 'processing') {
+      return;
+    }
+
+    setIsBrochureModalOpen(false);
+
+    if (brochureStatus !== 'success') {
+      setBrochureStatus('idle');
+      setBrochureProgress(0);
+      setBrochureStep('init');
+      setBrochureError(null);
+      setBrochureListing(null);
+      setBrochureContent(null);
+    }
+  }, [brochureStatus]);
+
+  const openBrochureInViewer = useCallback((contentId: string) => {
+    setIsBrochureModalOpen(false);
+    setBrochureStatus('idle');
+    setBrochureProgress(0);
+    setBrochureStep('init');
+    setBrochureError(null);
+    setBrochureListing(null);
+    setBrochureContent(null);
+    navigate(`/content/${contentId}`);
+  }, [navigate]);
+
+  const handleGenerateBrochure = useCallback(async () => {
+    if (brochureStatus === 'processing') {
+      return;
+    }
+
+    const listing = pickRandomSeededListing();
+    let hasFailed = false;
+
+    setBrochureListing(listing);
+    setBrochureStatus('processing');
+    setBrochureStep('init');
+    setBrochureProgress(BROCHURE_STEP_PROGRESS.init);
+    setBrochureError(null);
+    setBrochureContent(null);
+    setIsBrochureModalOpen(true);
+
+    const requestId = addRequest(`Property Brochure • ${listing.title}`, 'PROPERTY_BROCHURE', {
+      listingId: listing.listingId,
+      source: 'dashboard_quick_action',
+    });
+    brochureRequestIdRef.current = requestId;
+    updateRequestStatus(requestId, 'Processing');
+    updateRequestProgress(requestId, BROCHURE_STEP_PROGRESS.init, 'init');
+
+    const handleProgressUpdate = (event: ProgressEventData) => {
+      const step = normalizeBrochureStep(event);
+      const computedProgress = mapStepToProgress(step, event.progress);
+
+      setBrochureStep(step);
+      setBrochureProgress((prev) => Math.max(prev, computedProgress));
+
+      if (brochureRequestIdRef.current) {
+        updateRequestProgress(brochureRequestIdRef.current, computedProgress, step);
+        if (event.status === TaskStatus.PROCESSING || event.status === TaskStatus.QUEUED) {
+          updateRequestStatus(brochureRequestIdRef.current, 'Processing');
+        }
+      }
+
+      if (event.status === TaskStatus.FAILED) {
+        hasFailed = true;
+        const message = event.data?.error || 'Brochure generation failed.';
+        setBrochureStatus('error');
+        setBrochureError(message);
+        if (brochureRequestIdRef.current) {
+          updateRequestStatus(brochureRequestIdRef.current, 'Error', message);
+        }
+      }
+
+      if (event.status === TaskStatus.COMPLETED) {
+        setBrochureProgress(100);
+        setBrochureStep('completed');
+      }
+    };
+
+    try {
+      const apiContent = await intelligenceApi.generateBrochure(listing.listingId, {
+        context: {
+          listing_title: listing.title,
+          listing_location: listing.location,
+        },
+        onProgress: handleProgressUpdate,
+      });
+
+      if (hasFailed) {
+        return;
+      }
+
+      const mappedContent = mapApiIntelligenceContent(apiContent);
+      saveIntelligenceContent(mappedContent);
+      setBrochureContent(mappedContent);
+      setBrochureStatus('success');
+      setBrochureProgress(100);
+      setBrochureStep('completed');
+
+      if (brochureRequestIdRef.current) {
+        updateRequestStatus(brochureRequestIdRef.current, 'Complete');
+        updateRequestProgress(brochureRequestIdRef.current, 100, 'completed');
+      }
+    } catch (error) {
+      hasFailed = true;
+      const message = error instanceof IntelligenceApiError
+        ? error.message
+        : 'Unable to generate property brochure.';
+      setBrochureStatus('error');
+      setBrochureError(message);
+      if (brochureRequestIdRef.current) {
+        updateRequestStatus(brochureRequestIdRef.current, 'Error', message);
+      }
+    } finally {
+      brochureRequestIdRef.current = null;
+    }
+  }, [addRequest, brochureStatus, saveIntelligenceContent, updateRequestProgress, updateRequestStatus]);
+
+  const slides = useMemo(() => getSlides(metrics), [metrics]);
+
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
 
-  const slides = getSlides(metrics);
-  
+  // Placeholder handlers for upcoming AI modules (Phase 3.3)
+  const handleGenerateCMA = useCallback(() => {
+    // Placeholder: to be implemented in Phase 3.3
+    console.log('CMA Report generation is coming soon.');
+    alert('CMA Report is coming soon.');
+  }, []);
+
+  const handleGenerateSocialPost = useCallback(() => {
+    // Placeholder: to be implemented in Phase 3.3
+    console.log('Social Post generation is coming soon.');
+    alert('Social Post is coming soon.');
+  }, []);
+
   const nextSlide = () => {
     setDirection(1);
     setIndex((i) => (i + 1) % slides.length);
@@ -241,8 +461,25 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const brochureHeaderSubtitle = brochureListing
+    ? `${brochureListing.title}${brochureListing.location ? ` - ${brochureListing.location}` : ''}`
+    : undefined;
+
+  useEffect(() => {
+    if (brochureStatus !== 'success' || !brochureContent) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      openBrochureInViewer(brochureContent.contentId);
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [brochureStatus, brochureContent, openBrochureInViewer]);
+
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+    <>
+      <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8 space-y-6 sm:space-y-8">
         {/* Header */}
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -346,8 +583,87 @@ export default function Dashboard() {
           <Card title="Requests" desc="Track AI and workflow requests" icon={<ClipboardList className="w-6 h-6 text-orange-500" />} to="/requests" />
           <Card title="Marketing" desc="Create and manage campaigns" icon={<Megaphone className="w-6 h-6 text-purple-600" />} to="/marketing" />
         </section>
+
+        {/* AI Workflows Section */}
+        <section className="mt-2 sm:mt-3">
+          <div className="mb-3 sm:mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">AI Workflows</h3>
+            <p className="text-sm text-gray-600">Access your AI-powered tools for marketing and analysis</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <QuickActionTile
+              title="Property Brochure"
+              desc="Generate a marketing-ready brochure from listings."
+              icon={<FileText className="w-6 h-6 text-blue-600" />}
+              onClick={handleGenerateBrochure}
+              disabled={isBrochureProcessing}
+              loading={isBrochureProcessing}
+            />
+
+            <QuickActionTile
+              title="CMA Report"
+              desc="Create a comparative market analysis for clients."
+              icon={<BarChart3 className="w-6 h-6 text-emerald-600" />}
+              onClick={handleGenerateCMA}
+            />
+
+            <QuickActionTile
+              title="Social Post"
+              desc="Generate an optimized social media post."
+              icon={<Megaphone className="w-6 h-6 text-purple-600" />}
+              onClick={handleGenerateSocialPost}
+            />
+          </div>
+        </section>
       </div>
     </div>
+
+      <RefineModal
+        isOpen={isBrochureModalOpen}
+        onClose={handleCloseBrochureModal}
+        variant="preview"
+        headerTitle="Property Brochure Generator"
+        headerSubtitle={brochureHeaderSubtitle}
+      >
+        <div className="space-y-4">
+          <ProgressTracker
+            currentStep={brochureStep}
+            progress={brochureProgress}
+            status={
+              brochureStatus === 'error'
+                ? 'error'
+                : brochureStatus === 'success'
+                ? 'success'
+                : brochureStatus === 'processing'
+                ? 'processing'
+                : 'idle'
+            }
+            error={brochureStatus === 'error' ? (brochureError ?? 'Brochure generation failed.') : undefined}
+            steps={BROCHURE_PROGRESS_STEPS}
+          />
+          {brochureStatus === 'processing' && brochureListing && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+              Generating a brochure for <span className="font-semibold text-blue-900">{brochureListing.title}</span>
+              {brochureListing.location ? ` - ${brochureListing.location}` : ''}.
+            </div>
+          )}
+          {brochureStatus === 'error' && brochureError && (
+            <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+              {brochureError}
+            </div>
+          )}
+          {brochureStatus === 'success' && brochureContent && brochureStructured && (
+            <BrochurePreviewCard
+              content={brochureContent}
+              structured={brochureStructured}
+              listing={brochureListing}
+              onViewNow={() => openBrochureInViewer(brochureContent.contentId)}
+            />
+          )}
+        </div>
+      </RefineModal>
+    </>
   );
 }
 
@@ -357,6 +673,143 @@ interface CardProps {
   icon: React.ReactNode;
   to: string;
 }
+
+interface BrochurePreviewCardProps {
+  content: StoreIntelligenceContent;
+  structured: BrochureStructuredData;
+  listing?: SeededListing | null;
+  onViewNow: () => void;
+  isNavigating?: boolean;
+}
+
+function BrochurePreviewCard({ content, structured, listing, onViewNow, isNavigating = false }: BrochurePreviewCardProps) {
+  const quickFacts = [
+    structured.bedrooms ? { icon: <Bed className="w-4 h-4 text-blue-600" />, label: formatBedrooms(structured.bedrooms) ?? "" } : null,
+    structured.bathrooms ? { icon: <Bath className="w-4 h-4 text-blue-600" />, label: formatBathrooms(structured.bathrooms) ?? "" } : null,
+    structured.areaSqft ? { icon: <Ruler className="w-4 h-4 text-blue-600" />, label: formatSqft(structured.areaSqft) ?? "" } : null,
+    structured.propertyType ? { icon: <FileText className="w-4 h-4 text-blue-600" />, label: structured.propertyType } : null,
+  ].filter(Boolean) as Array<{ icon: React.ReactNode; label: string }>;
+
+  const title = structured.title || content.title;
+  const location = structured.location || listing?.location;
+  const highlights = structured.highlights.slice(0, 3);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Preview Ready</p>
+          <h4 className="text-lg font-semibold text-gray-900">{title}</h4>
+          {structured.subtitle && (
+            <p className="text-sm text-gray-500">{structured.subtitle}</p>
+          )}
+        </div>
+        <div className="text-right space-y-1">
+          {structured.price && (
+            <p className="text-lg font-semibold text-blue-600">{structured.price}</p>
+          )}
+          {location && (
+            <div className="flex items-center justify-end gap-1 text-sm text-gray-500">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{location}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {quickFacts.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-xs text-gray-600">
+          {quickFacts.map((fact, index) => (
+            <span
+              key={`${fact.label}-${index}`}
+              className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-700"
+            >
+              {fact.icon}
+              {fact.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {highlights.length > 0 && (
+        <div className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Highlights</h5>
+          <ul className="space-y-1 text-sm text-gray-700">
+            {highlights.map((highlight) => (
+              <li key={highlight} className="flex items-start gap-2">
+                <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                <span>{highlight}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {structured.description && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-blue-700">
+            <FileText className="w-4 h-4" />
+            Overview
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {structured.description.length > 340
+              ? `${structured.description.slice(0, 337)}...`
+              : structured.description}
+          </p>
+        </div>
+      )}
+
+      <button
+        onClick={onViewNow}
+        disabled={isNavigating}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:bg-blue-300"
+      >
+        View full brochure
+      </button>
+    </div>
+  );
+}
+
+interface QuickActionTileProps {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+function QuickActionTile({ title, desc, icon, onClick, disabled = false, loading = false }: QuickActionTileProps) {
+  return (
+    <motion.button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      whileHover={disabled ? undefined : { scale: 1.03, y: -4 }}
+      whileTap={disabled ? undefined : { scale: 0.98 }}
+      disabled={disabled}
+      className={`w-full text-left ${disabled ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}
+    >
+      <div className="aspect-[4/3] p-3 sm:p-6 rounded-2xl bg-white shadow-md hover:shadow-xl transition-shadow flex flex-col justify-center space-y-2 sm:space-y-4 text-center sm:text-left border border-gray-100 hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+        <div className="flex items-start justify-between sm:justify-start sm:gap-2">
+          <div className="mx-auto sm:mx-0">
+            {icon}
+          </div>
+          {loading && <Loader2 className="hidden sm:block w-4 h-4 animate-spin text-blue-500" />}
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-semibold text-sm sm:text-lg text-gray-900">{title}</h3>
+          <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">{desc}</p>
+        </div>
+        {loading && (
+          <div className="flex items-center justify-center sm:hidden">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+          </div>
+        )}
+      </div>
+    </motion.button>
+  );
+}
+
 
 function Card({ title, desc, icon, to }: CardProps) {
   return (
@@ -381,3 +834,4 @@ function Card({ title, desc, icon, to }: CardProps) {
     </Link>
   );
 }
+
