@@ -35,6 +35,7 @@ from fastapi import (
     APIRouter,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Union, Dict, Any, Optional
 import os
@@ -443,6 +444,18 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Lightweight version value for dev health checks
+# Prefer a package __version__, otherwise fall back to 'dev'
+VERSION = "dev"
+try:
+    from app.core import __version__ as _pkg_version  # type: ignore
+
+    if isinstance(_pkg_version, str) and _pkg_version:
+        VERSION = _pkg_version
+except Exception:
+    # Keep default VERSION = 'dev'
+    pass
+
 # Helper to register AI-dependent routers with graceful fallback
 def register_ai_router(router, prefix: str, tags: list[str], feature_name: str):
     if not router:
@@ -535,6 +548,13 @@ if file_processing_root_router:
     )
     logger.info("File processing root router included")
 
+# Static files for uploads (serves files created by export endpoints)
+try:
+    app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")
+    logger.info("Mounted static uploads at /uploads")
+except Exception as e:
+    logger.warning(f"Failed to mount /uploads: {e}")
+
 if performance_router:
     app.include_router(
         performance_router, prefix="/api/performance", tags=["Performance"]
@@ -566,6 +586,15 @@ if async_router:
 if documents_router:
     app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
     logger.info("Documents router included")
+
+# Export router (includes mock brochure export)
+try:
+    from app.api.v1.export_router import router as export_router
+
+    app.include_router(export_router, tags=["Export"])
+    logger.info("Export router included at /api/v1/export")
+except ImportError as e:
+    logger.warning(f"Export router not loaded: {e}")
 
 if health_v1_router:
     app.include_router(health_v1_router, prefix="/api/v1", tags=["Health"])
@@ -773,6 +802,17 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+# Minimal dev health endpoint (no auth, no SSE/LLM deps)
+@app.get("/healthz")
+async def dev_healthz():
+    return {"ok": True}
+
+
+# Minimal dev version endpoint
+@app.get("/version")
+async def dev_version():
+    return {"version": VERSION}
 
 
 # ========================================

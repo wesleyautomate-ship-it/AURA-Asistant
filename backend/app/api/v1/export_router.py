@@ -21,6 +21,9 @@ import secrets
 from app.core.middleware import get_current_user
 from app.core.models import User
 from app.schemas.content_types import ContentType
+from app.schemas.brochure import BrochureInput, BrochureResult
+from app.services.exporters.save_file import save_html
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -489,3 +492,124 @@ async def debug_cleanup_expired():
         "remaining": len(_share_tokens),
         "message": f"Removed {len(expired_tokens)} expired tokens",
     }
+
+
+# =============================================================================
+# MOCK BROCHURE EXPORT (No auth, dev helper)
+# =============================================================================
+
+
+@router.post("/brochure-mock", response_model=BrochureResult)
+async def export_brochure_mock(payload: BrochureInput):
+    """
+    Generate a simple brochure HTML (mock), save to /uploads, return file URL.
+
+    This endpoint does not use LLM/SSE/auth and is safe for dev.
+    """
+    task_id = uuid.uuid4().hex
+
+    title = payload.title or "Property Brochure"
+    subtitle = payload.subtitle or "Presented by Aura"
+    address = payload.address or "123 Main Street"
+    price = payload.price or "Contact for price"
+    bedrooms = payload.bedrooms if payload.bedrooms is not None else None
+    bathrooms = payload.bathrooms if payload.bathrooms is not None else None
+    area = payload.area_sqft if payload.area_sqft is not None else None
+    ptype = payload.property_type or "Residential"
+    highlights = payload.highlights or [
+        "Prime location",
+        "Modern finishes",
+        "Close to amenities",
+    ]
+    amenities = payload.amenities or [
+        "Fitness Center",
+        "Swimming Pool",
+        "24/7 Security",
+        "Covered Parking",
+    ]
+
+    # Inline CSS, Tailwind-like semantics (no external deps)
+    facts = []
+    if bedrooms is not None:
+        facts.append(f"{bedrooms} BR")
+    if bathrooms is not None:
+        facts.append(f"{bathrooms} BA")
+    if area is not None:
+        facts.append(f"{area:,} sqft")
+    if ptype:
+        facts.append(ptype)
+
+    facts_html = "".join(
+        f'<span class="chip">{item}</span>' for item in facts
+    )
+    highlights_html = "".join(
+        f"<li><span class='dot'></span><span>{h}</span></li>" for h in highlights
+    )
+    amenities_html = "".join(
+        f"<li><span class='dot'></span><span>{a}</span></li>" for a in amenities
+    )
+
+    html = f"""
+<!doctype html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <title>{title}</title>
+    <style>
+      :root {{ --blue: #2563eb; --bg: #f8fafc; --ink: #0f172a; --muted: #64748b; }}
+      body {{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--ink); }}
+      .wrap {{ max-width: 920px; margin: 24px auto; padding: 24px; background:#fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(15,23,42,.06); border:1px solid #e5e7eb; }}
+      .title {{ font-size: 28px; font-weight: 700; margin: 0; }}
+      .subtitle {{ margin-top: 4px; color: var(--muted); font-size: 14px; }}
+      .meta {{ display:flex; align-items: center; justify-content: space-between; margin-top: 12px; }}
+      .address {{ color: var(--muted); font-size: 14px; display:flex; gap:6px; align-items:center; }}
+      .price {{ font-size: 18px; font-weight: 700; color: var(--blue); }}
+      .chips {{ display:flex; flex-wrap:wrap; gap:8px; margin-top: 12px; }}
+      .chip {{ display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:600; }}
+      .section {{ margin-top: 20px; }}
+      .section h3 {{ font-size: 12px; text-transform: uppercase; letter-spacing:.08em; color: var(--muted); margin:0 0 8px; }}
+      ul {{ list-style:none; padding:0; margin:0; }}
+      li {{ display:flex; gap:8px; margin:6px 0; font-size:14px; color:#1f2937; }}
+      .dot {{ width:6px; height:6px; border-radius:999px; background: var(--blue); margin-top:8px; display:inline-block; flex: 0 0 auto; }}
+      .footer {{ margin-top: 22px; padding-top: 14px; border-top:1px solid #e5e7eb; color: var(--muted); font-size:12px; display:flex; justify-content:space-between; }}
+    </style>
+  </head>
+  <body>
+    <div class=\"wrap\">
+      <header>
+        <p class=\"subtitle\">{subtitle}</p>
+        <h1 class=\"title\">{title}</h1>
+        <div class=\"meta\">
+          <div class=\"address\">{address}</div>
+          <div class=\"price\">{price}</div>
+        </div>
+        <div class=\"chips\">{facts_html}</div>
+      </header>
+
+      <section class=\"section\">
+        <h3>Highlights</h3>
+        <ul>
+          {highlights_html}
+        </ul>
+      </section>
+
+      <section class=\"section\">
+        <h3>Amenities</h3>
+        <ul>
+          {amenities_html}
+        </ul>
+      </section>
+
+      <div class=\"footer\">
+        <span>Generated by Aura (mock)</span>
+        <span>Task ID: {task_id}</span>
+      </div>
+    </div>
+  </body>
+ </html>
+"""
+
+    file_url = save_html(html, prefix="brochure")
+
+    return BrochureResult(task_id=task_id, file_url=file_url, status="completed")

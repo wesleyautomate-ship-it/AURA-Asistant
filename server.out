@@ -1,0 +1,21 @@
+🚀 Starting PropertyPro AI Task Management API...
+📍 http://localhost:8000
+📖 API Docs: http://localhost:8000/docs
+💾 Health Check: http://localhost:8000/health
+
+🔧 Available endpoints:
+  GET    /api/v1/tasks           - List tasks
+  POST   /api/v1/tasks           - Create task
+  GET    /api/v1/tasks/{id}      - Get specific task
+  PATCH  /api/v1/tasks/{id}      - Update task
+  PATCH  /api/v1/tasks/{id}/complete - Toggle completion
+  DELETE /api/v1/tasks/{id}      - Delete task
+
+✨ Features enabled:
+  ✅ CORS enabled for frontend
+  ✅ Authentication disabled
+  ✅ Sample tasks loaded
+  ✅ In-memory storage
+
+Press Ctrl+C to stop the server
+

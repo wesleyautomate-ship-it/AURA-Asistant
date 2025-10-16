@@ -1,0 +1,152 @@
+import React, { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Users, Filter, Plus } from 'lucide-react';
+
+type ContactStatus = 'Active' | 'New' | 'Warm' | 'Cold';
+
+interface Contact {
+  id: string;
+  name: string;
+  status: ContactStatus;
+  lastActivity?: string;
+}
+
+const DEFAULT_CONTACTS: Contact[] = [
+  { id: '1', name: 'Alex Johnson', status: 'Active', lastActivity: '2h ago' },
+  { id: '2', name: 'Briana Chen', status: 'New', lastActivity: 'Today' },
+  { id: '3', name: 'Carlos Ramirez', status: 'Warm', lastActivity: '1d ago' },
+  { id: '4', name: 'Danielle Brooks', status: 'Active', lastActivity: '3h ago' },
+  { id: '5', name: 'Ethan Patel', status: 'Cold', lastActivity: '5d ago' },
+  { id: '6', name: 'Fatima Khan', status: 'Warm', lastActivity: 'Yesterday' },
+  { id: '7', name: 'Grace Lee', status: 'Active', lastActivity: '30m ago' },
+  { id: '8', name: 'Henry Nguyen', status: 'New', lastActivity: 'Today' },
+  { id: '9', name: 'Isabella Rossi', status: 'Cold', lastActivity: '1w ago' },
+  { id: '10', name: 'Jack Wilson', status: 'Warm', lastActivity: '2d ago' },
+];
+
+const statusStyles: Record<ContactStatus, { bg: string; text: string; dot: string }> = {
+  Active: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
+  New: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+  Warm: { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  Cold: { bg: 'bg-gray-100', text: 'text-gray-700', dot: 'bg-gray-400' },
+};
+
+const FILTERS: Array<'All' | ContactStatus> = ['All', 'Active', 'New', 'Warm', 'Cold'];
+
+export interface ContactsWorkspaceProps {
+  contacts?: Contact[];
+  onAddContact?: () => void;
+}
+
+export default function ContactsWorkspace({ contacts = DEFAULT_CONTACTS, onAddContact }: ContactsWorkspaceProps) {
+  const [activeFilter, setActiveFilter] = useState<'All' | ContactStatus>('All');
+
+  const filtered = useMemo(() => {
+    if (activeFilter === 'All') return contacts;
+    return contacts.filter(c => c.status === activeFilter);
+  }, [activeFilter, contacts]);
+
+  return (
+    <section className="w-full">
+      {/* Container: mobile-first, ensures header + filters visible, list scrolls */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100">
+                <Users className="w-5 h-5 text-emerald-600" />
+              </span>
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Your Contacts</h2>
+                <p className="text-xs sm:text-sm text-gray-500">{filtered.length} shown • {contacts.length} total</p>
+              </div>
+            </div>
+            <button
+              onClick={onAddContact}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs sm:text-sm font-medium hover:bg-blue-700 active:scale-95 transition"
+              aria-label="Add contact"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden xs:inline">Add</span>
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+            <div className="flex items-center text-gray-500 mr-1">
+              <Filter className="w-4 h-4" />
+            </div>
+            {FILTERS.map(f => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`px-3 py-1.5 text-xs sm:text-sm rounded-full border transition whitespace-nowrap ${
+                  activeFilter === f
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+                aria-pressed={activeFilter === f}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable list area - target mobile: show header+filters without page scroll */}
+        <div className="flex flex-col max-h-[60vh] sm:max-h-[65vh]">
+          <ul className="divide-y divide-gray-100 overflow-y-auto overscroll-contain">
+            {filtered.map((c, idx) => (
+              <motion.li
+                key={c.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: Math.min(idx * 0.02, 0.2) }}
+                className="px-4 py-3 sm:px-6 sm:py-4"
+              >
+                <ContactCard contact={c} />
+              </motion.li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="px-4 py-6 text-center text-sm text-gray-500">No contacts match this filter.</li>
+            )}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ContactCard({ contact }: { contact: Contact }) {
+  const style = statusStyles[contact.status];
+  const initials = getInitials(contact.name);
+
+  return (
+    <div className="flex items-center gap-3">
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 border border-gray-200 flex items-center justify-center">
+        <span className="text-sm font-semibold text-gray-700">{initials}</span>
+      </div>
+
+      {/* Main */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm sm:text-base font-medium text-gray-900 truncate">{contact.name}</p>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] sm:text-xs ${style.bg} ${style.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
+            {contact.status}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">Last activity • {contact.lastActivity ?? '—'}</p>
+      </div>
+    </div>
+  );
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+

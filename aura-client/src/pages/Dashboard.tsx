@@ -30,6 +30,7 @@ import { TaskStatus, type ProgressEventData } from '../types/intelligence';
 import { mapApiIntelligenceContent } from '../utils/intelligenceContent';
 import { parseBrochureStructuredData, formatBedrooms, formatBathrooms, formatSqft, type BrochureStructuredData } from '../utils/brochure';
 import { pickRandomSeededListing, type SeededListing } from '../data/seededListings';
+import DevStatus from '../components/DevStatus';
 
 interface Slide {
   title: string;
@@ -579,46 +580,24 @@ export default function Dashboard() {
         {/* Core Module Cards */}
         <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card title="Properties" desc="Browse and manage listings" icon={<Home className="w-6 h-6 text-blue-600" />} to="/properties" />
+          {/* New AI Workflow tile matching existing style (placed early to ensure first-screen visibility) */}
+          <CardButton
+            title="AI Workflow"
+            desc="Create brochure, CMA, or social"
+            icon={<Zap className="w-6 h-6 text-yellow-500" />}
+            onClick={() => navigate('/ai-workflow')}
+          />
           <Card title="Contacts" desc="Manage clients and relationships" icon={<Users className="w-6 h-6 text-green-600" />} to="/contacts" />
           <Card title="Requests" desc="Track AI and workflow requests" icon={<ClipboardList className="w-6 h-6 text-orange-500" />} to="/requests" />
           <Card title="Marketing" desc="Create and manage campaigns" icon={<Megaphone className="w-6 h-6 text-purple-600" />} to="/marketing" />
         </section>
 
-        {/* AI Workflows Section */}
-        <section className="mt-2 sm:mt-3">
-          <div className="mb-3 sm:mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">AI Workflows</h3>
-            <p className="text-sm text-gray-600">Access your AI-powered tools for marketing and analysis</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <QuickActionTile
-              title="Property Brochure"
-              desc="Generate a marketing-ready brochure from listings."
-              icon={<FileText className="w-6 h-6 text-blue-600" />}
-              onClick={handleGenerateBrochure}
-              disabled={isBrochureProcessing}
-              loading={isBrochureProcessing}
-            />
-
-            <QuickActionTile
-              title="CMA Report"
-              desc="Create a comparative market analysis for clients."
-              icon={<BarChart3 className="w-6 h-6 text-emerald-600" />}
-              onClick={handleGenerateCMA}
-            />
-
-            <QuickActionTile
-              title="Social Post"
-              desc="Generate an optimized social media post."
-              icon={<Megaphone className="w-6 h-6 text-purple-600" />}
-              onClick={handleGenerateSocialPost}
-            />
-          </div>
-        </section>
+        {/* (Removed inline AI Workflows section to keep first view clean) */}
       </div>
     </div>
 
+      <DevStatus />
+      {/* AI Workflow uses a dedicated full page route; no Bottom Sheet */}
       <RefineModal
         isOpen={isBrochureModalOpen}
         onClose={handleCloseBrochureModal}
@@ -811,6 +790,9 @@ function QuickActionTile({ title, desc, icon, onClick, disabled = false, loading
 }
 
 
+ 
+
+
 function Card({ title, desc, icon, to }: CardProps) {
   return (
     <Link to={to} className="block">
@@ -835,3 +817,61 @@ function Card({ title, desc, icon, to }: CardProps) {
   );
 }
 
+interface CardButtonProps {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}
+
+function CardButton({ title, desc, icon, onClick }: CardButtonProps) {
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left">
+      <motion.div
+        whileHover={{ scale: 1.03, y: -4 }}
+        whileTap={{ scale: 0.98 }}
+        className="aspect-[4/3] p-3 sm:p-6 rounded-2xl bg-white shadow-md hover:shadow-xl transition-shadow cursor-pointer flex flex-col justify-center space-y-2 sm:space-y-4 text-center sm:text-left border border-gray-100 hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        aria-label={`Open ${title}`}
+      >
+        <div className="flex items-start justify-between sm:justify-start sm:gap-2">
+          <div className="mx-auto sm:mx-0">
+            {icon}
+          </div>
+          <CardChevron className="hidden sm:block w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-semibold text-sm sm:text-lg text-gray-900">{title}</h3>
+          <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">{desc}</p>
+        </div>
+      </motion.div>
+    </button>
+  );
+}
+
+interface ActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  caption?: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+function ActionButton({ icon, label, caption, onClick, disabled = false }: ActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`w-full text-left rounded-xl shadow-md hover:shadow-lg transition active:scale-[0.99] border border-gray-100 bg-white p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'opacity-70 cursor-wait' : ''}`}
+      aria-label={label}
+    >
+      <div className="flex items-center gap-3">
+        <div>{icon}</div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-gray-900">{label}</div>
+          {caption && <div className="text-xs text-gray-600">{caption}</div>}
+        </div>
+      </div>
+    </button>
+  );
+}

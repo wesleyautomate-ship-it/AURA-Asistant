@@ -3,8 +3,13 @@ import { test, expect } from '@playwright/test';
 test('Frontend Quick Diagnostic', async ({ page }) => {
   console.log('🔍 Starting frontend diagnostic...');
   
-  // Navigate to frontend
-  await page.goto('/');
+  // Navigate to frontend with fallback
+  try {
+    await page.goto('/');
+  } catch (e) {
+    console.warn('Primary baseURL navigation failed, attempting fallback to http://localhost:5173');
+    await page.goto('http://localhost:5173/');
+  }
   
   // Take screenshot immediately
   await page.screenshot({ path: 'frontend-diagnostic.png', fullPage: true });

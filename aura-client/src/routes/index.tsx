@@ -14,7 +14,14 @@ import DeckBuilder from '../pages/DeckBuilder';
 import ContentViewer from '../pages/ContentViewer';
 import Marketing from '../pages/Marketing';
 import Contacts from '../pages/Contacts';
+import ContactDetail from '../pages/contacts/[id]';
 import Properties from '../pages/Properties';
+import AIWorkflow from '../pages/ai-workflow';
+import AIWorkflowBrochure from '../pages/ai-workflow/brochure';
+import AIWorkflowCMA from '../pages/ai-workflow/cma';
+import AIWorkflowSocial from '../pages/ai-workflow/social';
+import BrochureEditor from '../pages/ai-workflow/brochure/Editor';
+import BrochurePreview from '../pages/ai-workflow/brochure/Preview';
 
 export default function AppRoutes() {
   return (
@@ -29,10 +36,17 @@ export default function AppRoutes() {
       <Route path="/requests" element={<Requests />} />
       <Route path="/marketing" element={<Marketing />} />
       <Route path="/contacts" element={<Contacts />} />
+      <Route path="/contacts/:id" element={<ContactDetail />} />
       <Route path="/properties" element={<Properties />} />
       <Route path="/cma/:id" element={<CMAReport />} />
       <Route path="/deck/:id" element={<DeckBuilder />} />
       <Route path="/content/:contentId" element={<ContentViewer />} />
+      <Route path="/ai-workflow" element={<AIWorkflow />} />
+      <Route path="/ai-workflow/brochure" element={<AIWorkflowBrochure />} />
+      <Route path="/ai-workflow/brochure/editor/:draftId" element={<BrochureEditor />} />
+      <Route path="/ai-workflow/brochure/preview/:draftId" element={<BrochurePreview />} />
+      <Route path="/ai-workflow/cma" element={<AIWorkflowCMA />} />
+      <Route path="/ai-workflow/social" element={<AIWorkflowSocial />} />
       {/* Additional routes will be added in future versions:
           /properties (v2.9), /contacts (v2.9), /settings (v2.8) */}
     </Routes>
