@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 
 class BrochureInput(BaseModel):
@@ -20,3 +20,22 @@ class BrochureResult(BaseModel):
     file_url: str
     status: Literal["completed"]
 
+class BrochureDraftCreate(BaseModel):
+    templateKey: str = Field("clean-minimal")
+    data: Optional[Dict[str, Any]] = None
+
+
+class BrochureDraftUpdate(BaseModel):
+    data: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+    download_url: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BrochureDraftOut(BaseModel):
+    id: str
+    data: Dict[str, Any]
+    status: str
+    download_url: Optional[str]
+    created_at: str
+    updated_at: str

@@ -1,6 +1,110 @@
-INFO:     Started server process [27076]
+2025-10-17 00:02:01,110 - app.domain.listings.enhanced_real_estate_models - INFO - Loading enhanced_real_estate_models from C:\Dev\RealtorProAI\Realtor-assistant\backend\app\domain\listings\enhanced_real_estate_models.py
+2025-10-17 00:02:01,149 - app.main - INFO - Property management router loaded
+2025-10-17 00:02:01,163 - app.main - INFO - Clients router loaded
+2025-10-17 00:02:01,181 - app.main - INFO - Transactions router loaded
+2025-10-17 00:02:01,226 - app.main - INFO - Chat sessions router loaded
+2025-10-17 00:02:01,230 - app.main - INFO - Data router loaded
+2025-10-17 00:02:01,241 - app.main - INFO - File processing router loaded
+2025-10-17 00:02:01,244 - app.main - WARNING - Performance router not loaded: No module named 'redis'
+2025-10-17 00:02:01,247 - app.main - INFO - Feedback router loaded
+2025-10-17 00:02:01,275 - app.main - INFO - Admin router loaded
+2025-10-17 00:02:01,295 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-10-17 00:02:05,700 - rag_service - WARNING - \u26a0\ufe0f ChromaDB connection attempt 1 failed: Could not connect to a Chroma server. Are you sure it is running?
+2025-10-17 00:02:07,703 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-10-17 00:02:12,029 - rag_service - WARNING - \u26a0\ufe0f ChromaDB connection attempt 2 failed: Could not connect to a Chroma server. Are you sure it is running?
+2025-10-17 00:02:14,033 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-10-17 00:02:18,336 - rag_service - WARNING - \u26a0\ufe0f ChromaDB connection attempt 3 failed: Could not connect to a Chroma server. Are you sure it is running?
+2025-10-17 00:02:20,349 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-10-17 00:02:24,650 - rag_service - WARNING - \u26a0\ufe0f ChromaDB connection attempt 4 failed: Could not connect to a Chroma server. Are you sure it is running?
+2025-10-17 00:02:26,653 - chromadb.telemetry.product.posthog - INFO - Anonymized telemetry enabled. See                     https://docs.trychroma.com/telemetry for more information.
+2025-10-17 00:02:30,954 - rag_service - WARNING - \u26a0\ufe0f ChromaDB connection attempt 5 failed: Could not connect to a Chroma server. Are you sure it is running?
+2025-10-17 00:02:30,956 - rag_service - ERROR - \u274c Failed to connect to ChromaDB after all retries
+2025-10-17 00:02:30,956 - rag_service - WARNING - \u26a0\ufe0f Running without ChromaDB in development mode
+2025-10-17 00:02:30,962 - app.main - INFO - Report generation router loaded
+2025-10-17 00:02:30,980 - app.core.ai_content_generator - INFO - \u2705 Gemini Pro model configured successfully
+2025-10-17 00:02:30,981 - app.core.ai_content_generator - INFO - AIContentGenerator initialized: mock_mode=False
+2025-10-17 00:02:30,995 - app.main - INFO - Intelligence router loaded
+2025-10-17 00:02:30,996 - app.main - INFO - RAG service loaded
+2025-10-17 00:02:30,997 - app.main - INFO - AI manager loaded
+2025-10-17 00:02:30,999 - app.main - INFO - Action engine loaded
+2025-10-17 00:02:31,001 - app.main - WARNING - RAG monitoring not loaded: No module named 'redis'
+2025-10-17 00:02:31,004 - task_manager - INFO - \u2705 AI model configured for task management
+2025-10-17 00:02:31,008 - app.main - INFO - Async processing router loaded
+2025-10-17 00:02:31,030 - app.main - INFO - Documents router loaded
+2025-10-17 00:02:31,031 - app.main - INFO - Health v1 router loaded
+2025-10-17 00:02:31,036 - app.main - INFO - Auth v1 router loaded
+2025-10-17 00:02:31,044 - app.main - INFO - Nurturing router loaded
+2025-10-17 00:02:31,046 - app.main - WARNING - ML advanced router not loaded: No module named 'ml.services.prediction_service'
+2025-10-17 00:02:31,047 - root - WARNING - ML services not available: 'ml'. AI insights will not work.
+2025-10-17 00:02:31,061 - app.main - INFO - ML insights router loaded
+2025-10-17 00:02:31,062 - app.main - WARNING - ML websocket router not loaded: cannot import name 'get_current_user_websocket' from 'auth.middleware' (C:\Dev\RealtorProAI\Realtor-assistant\backend\auth\middleware.py)
+2025-10-17 00:02:31,064 - app.main - WARNING - Search optimization router not loaded: No module named 'redis'
+2025-10-17 00:02:31,074 - app.main - INFO - Database enhancement router loaded
+2025-10-17 00:02:31,096 - app.main - WARNING - Phase 3 advanced router not loaded: No module named 'psutil'
+2025-10-17 00:02:31,103 - app.main - INFO - Human expertise router loaded
+2025-10-17 00:02:31,106 - app.main - WARNING - AI request router not loaded: cannot import name 'UUID' from 'sqlalchemy' (C:\Dev\RealtorProAI\Realtor-assistant\.venv\Lib\site-packages\sqlalchemy\__init__.py)
+2025-10-17 00:02:31,116 - app.main - INFO - Team management router loaded
+2025-10-17 00:02:31,118 - app.main - WARNING - Property detection router not loaded: cannot import name 'get_current_user' from 'auth' (C:\Dev\RealtorProAI\Realtor-assistant\backend\auth\__init__.py)
+2025-10-17 00:02:31,120 - app.main - WARNING - Admin knowledge router not loaded: cannot import name 'get_current_user' from 'auth' (C:\Dev\RealtorProAI\Realtor-assistant\backend\auth\__init__.py)
+2025-10-17 00:02:31,136 - app.main - INFO - Marketing automation router loaded
+2025-10-17 00:02:31,152 - app.main - INFO - CMA reports router loaded
+2025-10-17 00:02:31,163 - app.main - INFO - Social media router loaded
+2025-10-17 00:02:31,172 - app.main - INFO - Task orchestration router loaded
+2025-10-17 00:02:31,185 - app.main - INFO - Analytics router loaded
+2025-10-17 00:02:31,199 - app.main - INFO - Workflows router loaded
+2025-10-17 00:02:31,201 - app.main - INFO - Command center router loaded
+2025-10-17 00:02:31,212 - app.main - INFO - Tasks router loaded
+2025-10-17 00:02:31,213 - app.main - INFO - Models loaded
+2025-10-17 00:02:31,213 - app.main - INFO - Including routers...
+2025-10-17 00:02:31,229 - app.main - INFO - Property router included at /api/v1/properties and /api/properties
+2025-10-17 00:02:31,233 - app.main - INFO - Clients router included at /api/v1/clients
+2025-10-17 00:02:31,237 - app.main - INFO - Transactions router included at /api/v1/transactions
+2025-10-17 00:02:31,248 - app.main - INFO - Chat sessions router included
+2025-10-17 00:02:31,250 - app.main - INFO - Chat root router included
+2025-10-17 00:02:31,250 - app.main - INFO - Data router included
+2025-10-17 00:02:31,251 - app.main - INFO - Data root router included
+2025-10-17 00:02:31,251 - app.main - INFO - File processing router included
+2025-10-17 00:02:31,255 - app.main - INFO - File processing root router included
+2025-10-17 00:02:31,255 - app.main - INFO - Mounted static uploads at /uploads
+2025-10-17 00:02:31,257 - app.main - INFO - Feedback router included
+2025-10-17 00:02:31,260 - app.main - INFO - Admin router included
+2025-10-17 00:02:31,261 - app.main - INFO - Admin ingest router included
+2025-10-17 00:02:31,264 - app.main - INFO - Report router included
+2025-10-17 00:02:31,265 - app.main - INFO - Async router included
+2025-10-17 00:02:31,268 - app.main - INFO - Documents router included
+2025-10-17 00:02:31,281 - app.main - INFO - Export router included at /api/v1/export
+2025-10-17 00:02:31,281 - app.main - INFO - Health v1 router included at /api/v1/health
+2025-10-17 00:02:31,282 - app.main - INFO - Auth v1 router included at /api/v1/auth
+2025-10-17 00:02:31,287 - app.main - INFO - Nurturing router included
+2025-10-17 00:02:31,297 - app.main - INFO - ML insights router included
+2025-10-17 00:02:31,301 - app.main - INFO - Database enhancement router included
+2025-10-17 00:02:31,304 - app.main - INFO - Human expertise router included at /api/v1/experts
+2025-10-17 00:02:31,308 - app.main - INFO - Team management router included
+2025-10-17 00:02:31,313 - app.main - INFO - Intelligence router included at /api/v1/intelligence
+2025-10-17 00:02:31,314 - app.main - INFO - Chat console router included at /api/v1/intelligence/chat
+2025-10-17 00:02:31,327 - app.main - INFO - Marketing automation router included at /api/v1/marketing
+2025-10-17 00:02:31,333 - app.main - INFO - CMA reports router included at /api/v1/cma
+2025-10-17 00:02:31,337 - app.main - INFO - Social media router included at /api/v1/social
+2025-10-17 00:02:31,342 - app.main - INFO - Analytics router included at /api/v1/analytics
+2025-10-17 00:02:31,347 - app.main - INFO - Workflows router included at /api/v1/workflows
+2025-10-17 00:02:31,351 - app.main - INFO - Task orchestration router included at /api/v1/orchestration
+2025-10-17 00:02:31,352 - app.main - INFO - Command center router included at /api/v1/command-center
+2025-10-17 00:02:31,359 - app.main - INFO - Tasks router included at /api/v1/tasks
+2025-10-17 00:02:31,360 - app.main - INFO - Starting PropertyPro AI Backend
+2025-10-17 00:02:31,363 - app.main - INFO - Voice transcription router included at /api/v1/voice
+2025-10-17 00:02:31,364 - app.main - INFO - AI streaming router included at /api/v1/ai_request/stream
+2025-10-17 00:02:31,380 - app.main - INFO - Contacts/followups/ai contacts routers included at root paths
+INFO:     Started server process [26548]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-ERROR:    [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
+INFO:     Uvicorn running on http://127.0.0.1:8077 (Press CTRL+C to quit)
+2025-10-17 00:02:31,831 - app.request - INFO - incoming_request
+2025-10-17 00:02:31,832 - app.request - INFO - request_completed
+2025-10-17 00:02:31,895 - app.request - INFO - incoming_request
+2025-10-17 00:02:31,896 - app.request - INFO - request_completed
+2025-10-17 00:02:31,923 - app.request - INFO - incoming_request
+2025-10-17 00:02:31,925 - app.request - INFO - request_completed
+2025-10-17 00:02:31,944 - app.request - INFO - incoming_request
+2025-10-17 00:02:31,945 - app.request - INFO - request_completed
+2025-10-17 00:02:31,950 - app.request - INFO - incoming_request
+2025-10-17 00:02:31,951 - app.request - INFO - request_completed

@@ -1,4 +1,5 @@
 import type { Contact, ContactDetail } from '../types/contacts';
+import { api } from './http';
 
 // Simulated network latency
 const delay = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
@@ -18,9 +19,13 @@ const delay = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, 
 });
 
 export async function getContacts(signal?: AbortSignal): Promise<Contact[]> {
+  if (api.enabled) {
+    const list = await api.get<Array<Contact & { status?: string }>>('/contacts', signal);
+    const tagMap = readTagsStore();
+    return list.map(c => ({ ...c, temperature: (c.temperature || (c as any).status || 'Warm') as Contact['temperature'], tags: tagMap[c.id] }));
+  }
   await delay(300, signal);
   const now = new Date();
-  // Mocked list
   const list: Contact[] = [
     { id: '1', name: 'Alex Johnson', temperature: 'Active', lastActivityAt: new Date(now.getTime() - 2*60*60*1000).toISOString() },
     { id: '2', name: 'Briana Chen', temperature: 'New', lastActivityAt: now.toISOString() },
@@ -33,6 +38,25 @@ export async function getContacts(signal?: AbortSignal): Promise<Contact[]> {
 }
 
 export async function getContactDetail(id: string, signal?: AbortSignal): Promise<ContactDetail> {
+  if (api.enabled) {
+    const d = await api.get<any>(`/contacts/${id}`, signal);
+    const activity = await getTimeline(id, signal);
+    const base: Contact = {
+      id: d.id || id,
+      name: d.name || mockNameFor(id),
+      temperature: (d.temperature || 'Warm') as Contact['temperature'],
+      email: d.email,
+      phone: d.phone,
+      lastActivityAt: d.lastActivityAt,
+    };
+    return {
+      ...base,
+      tags: readTagsStore()[id] || [],
+      notes: d.notes || '',
+      intentScore: d.intentScore ?? 62,
+      timeline: activity,
+    };
+  }
   await delay(350, signal);
   const base: Contact = {
     id,
@@ -64,6 +88,10 @@ export async function saveNotes(id: string, notes: string, signal?: AbortSignal)
 }
 
 export async function getTimeline(id: string, signal?: AbortSignal): Promise<ContactDetail['timeline']> {
+  if (api.enabled) {
+    const items = await api.get<Array<{id:string; type:string; at:string; text:string}>>(`/contacts/${id}/activity`, signal);
+    return items.map(it => ({ id: it.id, ts: it.at, type: (it.type as any), text: it.text }));
+  }
   await delay(280, signal);
   const now = Date.now();
   return [

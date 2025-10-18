@@ -1,3 +1,4 @@
+import { api } from './http';
 export type FollowUpChannel = 'call' | 'email' | 'whatsapp' | 'meeting';
 
 export interface FollowUpItem {
@@ -35,11 +36,25 @@ const delay = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, 
 });
 
 export async function listFollowUps(contactId: string, signal?: AbortSignal): Promise<FollowUpItem[]> {
+  if (api.enabled) {
+    return api.get<FollowUpItem[]>(`/followups?contactId=${encodeURIComponent(contactId)}`, signal);
+  }
   await delay(180, signal);
   return readStore().filter(i => i.contactId === contactId).sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
 }
 
 export async function createFollowUp(input: { contactId: string; channel: FollowUpChannel; dueAt: string; notes?: string }, signal?: AbortSignal): Promise<FollowUpItem> {
+  if (api.enabled) {
+    const item: FollowUpItem = {
+      id: `${input.contactId}-${Date.now()}`,
+      contactId: input.contactId,
+      channel: input.channel,
+      dueAt: input.dueAt,
+      notes: input.notes,
+      createdAt: new Date().toISOString(),
+    };
+    return api.post<FollowUpItem>(`/followups`, item);
+  }
   await delay(220, signal);
   const item: FollowUpItem = {
     id: `${input.contactId}-${Date.now()}`,
@@ -62,4 +77,3 @@ export async function nextFollowUp(contactId: string, signal?: AbortSignal): Pro
     .sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
   return items[0] ?? null;
 }
-

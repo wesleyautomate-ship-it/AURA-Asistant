@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Search, CheckCircle2, Check } from 'lucide-react';
 import { brochureDraftService } from '../../../services/brochureDrafts';
-import { generateBrochureHTML, exportBrochurePDF } from '../../../services/brochureEngine';
+import { renderDraft as apiRenderDraft } from '../../../features/brochure/api/brochure';
+import { useBrochureDraft } from '../../../features/brochure/hooks/useBrochureDraft';
 import type { BrochureDraft } from '../../../types/brochure';
 import { seededListings, type SeededListing } from '../../../data/seededListings';
 
@@ -24,14 +25,12 @@ function useDebouncedCallback<T extends any[]>(fn: (...args: T) => void, delay =
 
 export default function BrochureEditor() {
   const navigate = useNavigate();
-  const { draftId } = useParams();
+  const params = useParams();
+  const draftId = (params.draftId as string) || (params.id as string);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [draft, setDraft] = useState<BrochureDraft | null>(null);
+  const { draft, setDraft, error, saving, savedVisible, update } = useBrochureDraft(draftId);
   const [stepIndex, setStepIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [savedVisible, setSavedVisible] = useState(false);
 
   useEffect(() => {
     document.title = 'Brochure Editor — Aura';
@@ -39,36 +38,16 @@ export default function BrochureEditor() {
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!draftId) return;
-        const d = await brochureDraftService.getDraft(draftId);
-        setDraft(d);
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load draft');
-      }
-    })();
-  }, [draftId]);
-
-  const savePatch = useDebouncedCallback(async (patch: Partial<BrochureDraft>) => {
-    if (!draftId) return;
-    try {
-      setSaving(true);
-      const updated = await brochureDraftService.updateDraft(draftId, patch);
-      setDraft(updated);
-      setSaving(false);
-      setSavedVisible(true);
-      window.setTimeout(() => setSavedVisible(false), 1200);
-    } catch (e) {
-      setSaving(false);
-    }
-  }, 300);
+  // saving and savedVisible handled by hook
 
   const onBack = () => setStepIndex((i) => Math.max(0, i - 1));
   const onNext = () => setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
 
-  const canNext = stepIndex === 0 ? Boolean(draft?.propertyId) : true;
+  const canNext = (() => {
+    if (stepIndex === 0) return Boolean(draft?.propertyId);
+    if (stepIndex === 1) return Boolean(draft?.content?.title || draft?.content?.description);
+    return true;
+  })();
 
   const progress = Math.round(((stepIndex + 1) / STEPS.length) * 100);
 
@@ -103,29 +82,32 @@ export default function BrochureEditor() {
         <div className="space-y-3">
           {stepIndex === 0 && (
             <PropertyStep draft={draft} onSelect={(listing) => {
-              savePatch({ propertyId: listing.listingId, listingData: listing });
+              update({ propertyId: listing.listingId, listingData: listing });
             }} />
           )}
           {stepIndex === 1 && (
-            <ContentStep draft={draft} onChange={(content) => savePatch({ content })} />
+            <ContentStep draft={draft} onChange={(content) => update({ content })} />
           )}
           {stepIndex === 2 && (
-            <BrandingStep draft={draft} onChange={(brand) => savePatch({ brand })} />
+            <BrandingStep draft={draft} onChange={(brand) => update({ brand })} />
           )}
           {stepIndex === 3 && (
             <ReviewStep draft={draft} error={genError} onGenerate={async () => {
-              if (!draftId || !draft) return;
-              // Update status to generating
-              setDraft((d) => (d ? { ...d, status: 'generating' } : d));
-              await brochureDraftService.updateDraft(draftId, { status: 'generating' });
+              if (!draftId) return;
               try {
                 setGenError(null);
-                const html = await generateBrochureHTML(draft);
-                await brochureDraftService.updateDraft(draftId, { output: { ...(draft.output || {}), html } });
-                const { pdfUrl } = await exportBrochurePDF(html);
-                const ready = await brochureDraftService.updateDraft(draftId, { output: { ...(draft.output || {}), html, pdfUrl }, status: 'ready' });
-                setDraft(ready);
-                navigate(`/ai-workflow/brochure/preview/${draftId}`);
+                setDraft((d) => (d ? { ...d, status: 'generating' } : d));
+                await brochureDraftService.updateDraft(draftId, { status: 'generating' });
+                await apiRenderDraft(draftId);
+                // poll until ready
+                const start = Date.now();
+                const timeoutMs = 60000;
+                while (Date.now() - start < timeoutMs) {
+                  const refreshed = await brochureDraftService.getDraft(draftId);
+                  setDraft(refreshed);
+                  if (refreshed.status === 'ready') break;
+                  await new Promise(r => setTimeout(r, 900));
+                }
               } catch (e: any) {
                 const msg = e?.message || 'Failed to generate brochure';
                 setGenError(msg);
@@ -134,23 +116,8 @@ export default function BrochureEditor() {
               }
             }} onRetry={async () => {
               // Retry generation using same flow
-              if (!draftId || !draft) return;
+              if (!draftId) return;
               setGenError(null);
-              setDraft((d) => (d ? { ...d, status: 'generating' } : d));
-              await brochureDraftService.updateDraft(draftId, { status: 'generating' });
-              try {
-                const html = await generateBrochureHTML(draft);
-                await brochureDraftService.updateDraft(draftId, { output: { ...(draft.output || {}), html } });
-                const { pdfUrl } = await exportBrochurePDF(html);
-                const ready = await brochureDraftService.updateDraft(draftId, { output: { ...(draft.output || {}), html, pdfUrl }, status: 'ready' });
-                setDraft(ready);
-                navigate(`/ai-workflow/brochure/preview/${draftId}`);
-              } catch (e: any) {
-                const msg = e?.message || 'Failed to generate brochure';
-                setGenError(msg);
-                const errored = await brochureDraftService.updateDraft(draftId, { status: 'error', error: msg });
-                setDraft(errored);
-              }
             }} />
           )}
 
@@ -366,7 +333,7 @@ function ReviewStep({ draft, error, onGenerate, onRetry }: { draft: BrochureDraf
         </div>
         <div className="mt-4">
           <button type="button" onClick={onGenerate} className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            Generate Brochure
+            Render PDF
           </button>
           {draft?.status === 'generating' && <span className="ml-3 text-sm text-blue-700">Generating…</span>}
           {draft?.status === 'ready' && <span className="ml-3 text-sm text-emerald-700">Ready</span>}

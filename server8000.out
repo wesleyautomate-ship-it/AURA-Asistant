@@ -1,8 +1,8 @@
 [OK] Loaded environment from: C:\Dev\RealtorProAI\Realtor-assistant\backend\.env.development
 [OK] Loaded environment from: C:\Dev\RealtorProAI\Realtor-assistant\backend\.env.development
 Loading enhanced_real_estate_models from C:\Dev\RealtorProAI\Realtor-assistant\backend\app\domain\listings\enhanced_real_estate_models.py
-INFO:     127.0.0.1:61483 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61483 - "GET /contacts HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61483 - "POST /ai/followup HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61483 - "POST /followups HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61483 - "GET /followups?contactId=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51407 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51407 - "GET /contacts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51407 - "POST /ai/followup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51407 - "POST /followups HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51407 - "GET /followups?contactId=1 HTTP/1.1" 200 OK

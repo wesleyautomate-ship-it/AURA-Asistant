@@ -11,6 +11,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Table,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -276,3 +277,22 @@ class ChatMessage(Base):
     tokens_in = Column(Integer, nullable=True)
     tokens_out = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=func.now())
+
+
+# ========================================
+# Brochure Drafts (AI brochure flow)
+# ========================================
+
+
+class BrochureDraft(Base):
+    __tablename__ = "brochure_drafts"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    data = Column(JSON, default=dict)  # entire draft blob
+    status = Column(String(20), default="draft", index=True)
+    download_url = Column(String(512), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<BrochureDraft id={self.id} status={self.status}>"

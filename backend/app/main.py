@@ -590,8 +590,10 @@ if documents_router:
 # Export router (includes mock brochure export)
 try:
     from app.api.v1.export_router import router as export_router
+    from app.api.v1.brochures_router import router as brochures_router
 
     app.include_router(export_router, tags=["Export"])
+    app.include_router(brochures_router, tags=["Brochures"])
     logger.info("Export router included at /api/v1/export")
 except ImportError as e:
     logger.warning(f"Export router not loaded: {e}")
@@ -836,6 +838,19 @@ try:
     logger.info("AI streaming router included at /api/v1/ai_request/stream")
 except ImportError as e:
     logger.warning(f"AI streaming router not loaded: {e}")
+    
+# Contacts & Followups minimal API (additive, dev-friendly)
+try:
+    from app.api.v1.contacts_router import router as contacts_router
+    from app.api.v1.followups_router import router as followups_router
+    from app.api.v1.ai_contacts_router import router as ai_contacts_router
+
+    app.include_router(contacts_router)
+    app.include_router(followups_router)
+    app.include_router(ai_contacts_router)
+    logger.info("Contacts/followups/ai contacts routers included at root paths")
+except ImportError as e:
+    logger.warning(f"Contacts/Followups/AI contacts routers not loaded: {e}")
 if __name__ == "__main__":
     import uvicorn
 

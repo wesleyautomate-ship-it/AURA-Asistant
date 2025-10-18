@@ -31,3 +31,15 @@ export async function createBrochure(input: Partial<BrochureInput>): Promise<Bro
   return res.json();
 }
 
+// Generic HTML save via export service; returns a file URL in BrochureResult shape
+export async function saveHtml(payload: { html: string; prefix?: string }): Promise<BrochureResult> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/export/html-save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ html: payload.html, prefix: payload.prefix || 'brochure' }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to save HTML: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}

@@ -49,6 +49,10 @@ export default function ContactDetailPage() {
   // Recommendations & NBA
   const [recs, setRecs] = useState<Array<{ id: string; title: string; area: string; price: string; route: string }>>([]);
   const [nba, setNba] = useState<{ title: string; detail: string } | null>(null);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [recsError, setRecsError] = useState<string | null>(null);
+  const [nbaLoading, setNbaLoading] = useState(false);
+  const [nbaError, setNbaError] = useState<string | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -85,6 +89,48 @@ export default function ContactDetailPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="space-y-4 sm:space-y-5">
+          <AIActionBar
+            isProcessing={aiBusy}
+            onGenerateFollowUp={async () => {
+              setComposeOpen(true);
+              setAiBusy(true);
+              try {
+                const txt = await generateFollowUp(contact.id, { tone: composeTone, goal: composeGoal });
+                setComposeText(txt);
+              } finally {
+                setAiBusy(false);
+              }
+            }}
+            onScheduleFollowUp={() => setScheduleOpen(true)}
+            onSummarizeNotes={async () => {
+              setAiBusy(true);
+              try {
+                const sum = await summarizeNotes(contact.id);
+                setSummaryText(sum);
+                setSummaryOpen(true);
+              } finally { setAiBusy(false); }
+            }}
+            onRecommendProperties={async () => {
+              setRecsError(null);
+              setRecsLoading(true);
+              try {
+                const items = await recommendProperties(contact.id);
+                setRecs(items);
+              } catch (e) {
+                setRecsError('Failed to load recommendations');
+              } finally { setRecsLoading(false); }
+            }}
+            onNextBestAction={async () => {
+              setNbaError(null);
+              setNbaLoading(true);
+              try {
+                const val = await nextBestAction(contact.id);
+                setNba(val);
+              } catch (e) {
+                setNbaError('Failed to load next best action');
+              } finally { setNbaLoading(false); }
+            }}
+          />
           {(() => {
             const handleScheduleFollowUp = () => { setComposeOpen(false); setScheduleOpen(true); };
             const handleGenerateFollowUp = async () => {
@@ -161,7 +207,22 @@ export default function ContactDetailPage() {
                 }}
               />
               {/* Recommendations List */}
-              {recs.length > 0 && (
+              {recsLoading && (
+                <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
+                  <p className="text-sm text-gray-600">Loading recommendations…</p>
+                </section>
+              )}
+              {!recsLoading && recsError && (
+                <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
+                  <p className="text-sm text-red-600">{recsError}</p>
+                </section>
+              )}
+              {!recsLoading && !recsError && recs.length === 0 && (
+                <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
+                  <p className="text-sm text-gray-600">No recommendations yet.</p>
+                </section>
+              )}
+              {!recsLoading && !recsError && recs.length > 0 && (
                 <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-semibold text-gray-900">Recommendations</p>
@@ -188,7 +249,17 @@ export default function ContactDetailPage() {
               )}
 
               {/* Next Best Action Card */}
-              {nba && (
+              {nbaLoading && (
+                <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
+                  <p className="text-sm text-gray-600">Loading next best action…</p>
+                </section>
+              )}
+              {!nbaLoading && nbaError && (
+                <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
+                  <p className="text-sm text-red-600">{nbaError}</p>
+                </section>
+              )}
+              {!nbaLoading && !nbaError && nba && (
                 <section className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -274,13 +345,21 @@ export default function ContactDetailPage() {
         onClose={() => setScheduleOpen(false)}
         onSave={async (data) => {
           const ac = new AbortController();
-          await createFollowUp({ contactId: contact.id, ...data }, ac.signal);
+          const created = await createFollowUp({ contactId: contact.id, ...data }, ac.signal);
           const items = await listFollowUps(contact.id);
           setFollowUps(items);
           const now = Date.now();
           const upcoming = items.filter(i => new Date(i.dueAt).getTime() >= now)
             .sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0] || null;
           setNextFU(upcoming);
+          // Optimistic activity refresh
+          setDetail(prev => prev ? {
+            ...prev,
+            timeline: [
+              { id: created.id, ts: new Date().toISOString(), type: created.channel as any, text: `Scheduled ${created.channel} follow-up for ${new Date(created.dueAt).toLocaleString()}` },
+              ...prev.timeline,
+            ],
+          } : prev);
           setScheduleOpen(false);
         }}
       />

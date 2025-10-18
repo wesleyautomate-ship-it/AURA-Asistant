@@ -96,6 +96,39 @@ class ExportStatusResponse(BaseModel):
         }
 
 
+# -----------------------------------------------------------------------------
+# HTML Save (generic) — reuse save_html and BrochureResult shape
+# -----------------------------------------------------------------------------
+
+
+class HtmlSaveInput(BaseModel):
+    """Save raw HTML to uploads and return a file URL."""
+
+    html: str = Field(..., description="Raw HTML content to save")
+    prefix: str = Field("brochure", description="Filename prefix")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "html": "<html><body><h1>Brochure</h1></body></html>",
+                "prefix": "brochure",
+            }
+        }
+
+
+@router.post("/html-save", response_model=BrochureResult)
+async def html_save(payload: HtmlSaveInput):
+    """
+    Save provided HTML to the uploads directory and return a stable file URL.
+
+    This mirrors the mock brochure export flow but takes HTML directly, letting
+    the client generate markup and rely on the server for storage/linking.
+    """
+    task_id = uuid.uuid4().hex
+    file_url = save_html(payload.html, prefix=payload.prefix or "brochure")
+    return BrochureResult(task_id=task_id, file_url=file_url, status="completed")
+
+
 # =============================================================================
 # TEMPORARY STORAGE (Replace with database in production)
 # =============================================================================

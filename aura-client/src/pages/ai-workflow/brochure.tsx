@@ -39,7 +39,7 @@ export default function AIWorkflowBrochure() {
                 if (!selected) return;
                 const templateKey = mapTemplateIdToKey(selected);
                 const draft = await brochureDraftService.createDraft(templateKey);
-                navigate(`/ai-workflow/brochure/editor/${draft.id}`);
+                navigate(`/brochure/${draft.id}/property`);
               }}
             >
               Use Template
@@ -49,7 +49,7 @@ export default function AIWorkflowBrochure() {
               className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
               onClick={async () => {
                 const draft = await brochureDraftService.createDraft('clean-minimal');
-                navigate(`/ai-workflow/brochure/editor/${draft.id}`);
+                navigate(`/brochure/${draft.id}/property`);
               }}
             >
               Start from Blank

@@ -45,6 +45,7 @@ export default function AppRoutes() {
       <Route path="/ai-workflow/brochure" element={<AIWorkflowBrochure />} />
       <Route path="/ai-workflow/brochure/editor/:draftId" element={<BrochureEditor />} />
       <Route path="/ai-workflow/brochure/preview/:draftId" element={<BrochurePreview />} />
+      <Route path="/brochure/:id/:tab" element={<BrochureEditor />} />
       <Route path="/ai-workflow/cma" element={<AIWorkflowCMA />} />
       <Route path="/ai-workflow/social" element={<AIWorkflowSocial />} />
       {/* Additional routes will be added in future versions:

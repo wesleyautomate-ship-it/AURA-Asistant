@@ -1,4 +1,5 @@
 import type { BrochureDraft } from '../types/brochure';
+import { saveHtml } from '../api/documents';
 
 function escapeHtml(input: string | undefined): string {
   if (!input) return '';
@@ -78,6 +79,12 @@ export async function generateBrochureHTML(draft: BrochureDraft): Promise<string
   return html;
 }
 
+// Save generated HTML via backend and return a stable file URL (mapped as pdfUrl for UI)
+export async function exportBrochureFile(html: string): Promise<{ pdfUrl: string }> {
+  const data = await saveHtml({ html, prefix: 'brochure' });
+  return { pdfUrl: data.file_url };
+}
+
 export async function exportBrochurePDF(html: string): Promise<{ pdfUrl: string }> {
   // Mock client-side PDF export: create a Blob with placeholder content.
   // In production, POST to backend service to render HTML → PDF, return URL.
@@ -85,4 +92,3 @@ export async function exportBrochurePDF(html: string): Promise<{ pdfUrl: string 
   const pdfUrl = URL.createObjectURL(mockPdfBlob);
   return { pdfUrl };
 }
-

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Share2, Download, Save } from 'lucide-react';
 import { brochureDraftService } from '../../../services/brochureDrafts';
@@ -84,16 +84,28 @@ export default function BrochurePreview() {
         )}
 
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          {draft?.output?.html ? (
-            <iframe
-              title="Brochure HTML"
-              className="w-full h-[70vh]"
-              srcDoc={draft.output.html}
-              sandbox="allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-            />
-          ) : (
-            <div className="p-6 text-sm text-gray-600">No preview available.</div>
-          )}
+          <div className="p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900">{draft?.content?.title || draft?.listingData?.title || 'Property Brochure'}</h2>
+            <p className="text-sm text-gray-600">{draft?.content?.description || `Discover ${draft?.listingData?.title || 'this property'}.`}</p>
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-gray-500">Highlights</h3>
+              <ul className="list-disc pl-5 text-sm text-gray-700">
+                {(draft?.content?.highlights || ['Prime location','Modern amenities','Spacious layout']).map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-gray-500">Amenities</h3>
+              <ul className="list-disc pl-5 text-sm text-gray-700">
+                {(draft?.listingData?.amenities || []).slice(0,5).map((a: any, i: number) => (<li key={i}>{String(a)}</li>))}
+              </ul>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-xs uppercase tracking-wide text-gray-500">Agent</h3>
+              <p className="text-sm text-gray-700">{draft?.brand ? 'Branded' : 'Unbranded'}</p>
+            </div>
+          </div>
         </div>
     </div>
 
