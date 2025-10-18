@@ -10,7 +10,10 @@ import time
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
-import chromadb
+try:  # Optional dependency
+    import chromadb  # type: ignore
+except ImportError:  # pragma: no cover
+    chromadb = None  # type: ignore
 from sqlalchemy import create_engine, text
 import json
 import hashlib
@@ -49,6 +52,10 @@ class HybridSearchEngine:
     """Hybrid search engine combining vector and structured search"""
     
     def __init__(self, database_url: str, chroma_host: str = "localhost", chroma_port: int = 8000):
+        if chromadb is None:
+            raise RuntimeError(
+                "chromadb package is required to use HybridSearchEngine but is not installed."
+            )
         self.engine = create_engine(database_url)
         self.chroma_client = self._initialize_chroma_client(chroma_host, chroma_port)
         self.cache_manager = cache_manager

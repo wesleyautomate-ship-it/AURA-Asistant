@@ -8,7 +8,10 @@ import os
 import re
 import time
 from typing import List, Dict, Any, Optional, Tuple
-import chromadb
+try:  # Optional dependency
+    import chromadb  # type: ignore
+except ImportError:  # pragma: no cover
+    chromadb = None  # type: ignore
 from sqlalchemy import create_engine, text
 import logging
 from dataclasses import dataclass
@@ -183,6 +186,10 @@ class ContextItem:
 
 class EnhancedRAGService:
     def __init__(self):
+        if chromadb is None:
+            raise RuntimeError(
+                "chromadb package is required to use EnhancedRAGService but is not installed."
+            )
         self.engine = create_engine(os.getenv("DATABASE_URL"))
 
         # Enhanced ChromaDB initialization with retry logic

@@ -1,7 +1,27 @@
-from fastapi import APIRouter, HTTPException
+from __future__ import annotations
+
+import json
+import logging
+import uuid
+from datetime import datetime
+from typing import List, Optional, Tuple
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from typing import List, Optional, Literal
-from datetime import datetime, timedelta
+from sqlalchemy import func, or_
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.models import AuditLog
+from app.domain.listings.enhanced_real_estate_models import (
+    ContactActivity,
+    ContactNote,
+    EnhancedClient,
+    FollowUp as FollowUpModel,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Contacts"])
 
@@ -9,7 +29,7 @@ router = APIRouter(tags=["Contacts"])
 class ContactBrief(BaseModel):
     id: str
     name: str
-    temperature: Literal["New", "Active", "Warm", "Cold", "Dormant"]
+    temperature: str
     lastActivityAt: Optional[str] = None
     avatarUrl: Optional[str] = None
 
@@ -17,7 +37,7 @@ class ContactBrief(BaseModel):
 class ContactDetail(BaseModel):
     id: str
     name: str
-    temperature: Literal["New", "Active", "Warm", "Cold", "Dormant"]
+    temperature: str
     email: Optional[str] = None
     phone: Optional[str] = None
     lastActivityAt: Optional[str] = None
@@ -28,112 +48,385 @@ class ContactDetail(BaseModel):
 
 class ActivityItem(BaseModel):
     id: str
-    type: Literal["call", "email", "ai", "whatsapp", "meeting"]
+    type: str
     at: str  # ISO time
     text: str
 
 
-# In-memory store (TODO: replace with persistent DB models)
-_now = datetime.utcnow()
-_CONTACTS: dict[str, ContactDetail] = {
-    "1": ContactDetail(
-        id="1",
-        name="Alex Johnson",
-        temperature="Active",
-        email="alex.j@example.com",
-        phone="+971 50 123 4567",
-        lastActivityAt=(_now - timedelta(hours=2)).isoformat() + "Z",
-        notes="Initial notes...\n- Preferences: Sea view, 2-3BR\n- Budget: ~6M AED",
-        intentScore=62,
-        signals=["Opened brochure", "Visited listing page"],
-    ),
-    "2": ContactDetail(
-        id="2",
-        name="Briana Chen",
-        temperature="New",
-        email="briana.c@example.com",
-        phone="+971 52 555 0101",
-        lastActivityAt=_now.isoformat() + "Z",
-        notes="Call back after 6pm.",
-        intentScore=48,
-        signals=["Clicked email"],
-    ),
-    "3": ContactDetail(
-        id="3",
-        name="Carlos Ramirez",
-        temperature="Warm",
-        email="carlos.r@example.com",
-        phone="+971 54 000 2233",
-        lastActivityAt=(_now - timedelta(days=1)).isoformat() + "Z",
-        notes="Interested in Marina 2BR.",
-        intentScore=57,
-        signals=["Saved property"],
-    ),
-}
+class ContactNotesUpdate(BaseModel):
+    notes: str
 
-_ACTIVITY: dict[str, List[ActivityItem]] = {
-    "1": [
-        ActivityItem(
-            id="1-t1",
-            type="call",
-            at=(_now - timedelta(minutes=30)).isoformat() + "Z",
-            text="Discussed waterfront options"
-        ),
-        ActivityItem(
-            id="1-t2",
-            type="email",
-            at=(_now - timedelta(hours=2)).isoformat() + "Z",
-            text="Sent brochure PDF"
-        ),
-        ActivityItem(
-            id="1-t3",
-            type="ai",
-            at=(_now - timedelta(hours=20)).isoformat() + "Z",
-            text="AI summarized last meeting"
-        ),
-    ],
-    "2": [
-        ActivityItem(
-            id="2-t1",
-            type="email",
-            at=(_now - timedelta(minutes=10)).isoformat() + "Z",
-            text="Sent intro email"
-        ),
-    ],
-    "3": [
-        ActivityItem(
-            id="3-t1",
-            type="meeting",
-            at=(_now - timedelta(days=3)).isoformat() + "Z",
-            text="On-site viewing booked"
-        ),
-    ],
-}
+
+class ContactNotesResponse(BaseModel):
+    id: str
+    notes: str
+    updatedAt: str
+
+
+def _ensure_db(db: Optional[Session]) -> Session:
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    return db
+
+
+def _parse_contact_id(contact_id: str) -> int:
+    try:
+        return int(contact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid contact id") from exc
+
+
+def _to_iso(dt: Optional[datetime]) -> Optional[str]:
+    if not dt:
+        return None
+    if dt.tzinfo:
+        return dt.isoformat()
+    return dt.isoformat() + "Z"
 
 
 @router.get("/contacts", response_model=List[ContactBrief])
-async def list_contacts() -> List[ContactBrief]:
-    return [
-        ContactBrief(
-            id=c.id,
-            name=c.name,
-            temperature=c.temperature,
-            lastActivityAt=c.lastActivityAt,
+async def list_contacts(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None, min_length=1),
+    db: Optional[Session] = Depends(get_db),
+) -> List[ContactBrief]:
+    session = _ensure_db(db)
+    try:
+        last_activity_subquery = (
+            session.query(
+                ContactActivity.contact_id.label("contact_id"),
+                func.max(ContactActivity.occurred_at).label("last_activity_at"),
+            )
+            .group_by(ContactActivity.contact_id)
+            .subquery()
         )
-        for c in _CONTACTS.values()
-    ]
+
+        query = (
+            session.query(
+                EnhancedClient,
+                last_activity_subquery.c.last_activity_at,
+            )
+            .outerjoin(
+                last_activity_subquery,
+                EnhancedClient.id == last_activity_subquery.c.contact_id,
+            )
+        )
+
+        if search:
+            pattern = f"%{search.strip().lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(EnhancedClient.name).like(pattern),
+                    func.lower(func.coalesce(EnhancedClient.email, "")).like(pattern),
+                    func.lower(func.coalesce(EnhancedClient.phone, "")).like(pattern),
+                )
+            )
+
+        order_expr = func.coalesce(
+            last_activity_subquery.c.last_activity_at,
+            EnhancedClient.last_activity_at,
+            EnhancedClient.updated_at,
+            EnhancedClient.created_at,
+        )
+        rows = (
+            query.order_by(order_expr.desc().nullslast(), EnhancedClient.id.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to list contacts")
+        raise HTTPException(status_code=500, detail="Failed to list contacts") from exc
+
+    output: List[ContactBrief] = []
+    for client, last_activity_at in rows:
+        status = getattr(client, "client_status", None) or ""
+        temperature = {
+            "active": "Active",
+            "new": "New",
+            "warm": "Warm",
+            "cold": "Cold",
+            "dormant": "Dormant",
+        }.get(status.lower(), "Warm")
+        output.append(
+            ContactBrief(
+                id=str(client.id),
+                name=client.name,
+                temperature=temperature,
+                lastActivityAt=_to_iso(last_activity_at),
+            )
+        )
+    return output
 
 
 @router.get("/contacts/{contact_id}", response_model=ContactDetail)
-async def get_contact(contact_id: str) -> ContactDetail:
-    if contact_id not in _CONTACTS:
+async def get_contact(
+    contact_id: str,
+    db: Optional[Session] = Depends(get_db),
+) -> ContactDetail:
+    session = _ensure_db(db)
+    cid = _parse_contact_id(contact_id)
+
+    try:
+        contact = (
+            session.query(EnhancedClient)
+            .filter(EnhancedClient.id == cid)
+            .first()
+        )
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to load contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to load contact") from exc
+
+    if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
-    return _CONTACTS[contact_id]
+
+    try:
+        latest_note = (
+            session.query(ContactNote)
+            .filter(ContactNote.contact_id == contact.id)
+            .order_by(ContactNote.created_at.desc())
+            .first()
+        )
+        last_activity = (
+            session.query(ContactActivity.occurred_at)
+            .filter(ContactActivity.contact_id == contact.id)
+            .order_by(ContactActivity.occurred_at.desc())
+            .first()
+        )
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to load contact detail %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to load contact") from exc
+
+    status = getattr(contact, "client_status", "") or ""
+    temperature = {
+        "active": "Active",
+        "new": "New",
+        "warm": "Warm",
+        "cold": "Cold",
+        "dormant": "Dormant",
+    }.get(status.lower(), "Warm")
+
+    last_activity_at = _to_iso(last_activity[0]) if last_activity else None
+
+    return ContactDetail(
+        id=str(contact.id),
+        name=contact.name,
+        temperature=temperature,
+        email=getattr(contact, "email", None),
+        phone=getattr(contact, "phone", None),
+        lastActivityAt=last_activity_at,
+        notes=latest_note.body if latest_note else "",
+        intentScore=None,
+        signals=None,
+    )
+
+
+@router.patch("/contacts/{contact_id}/notes", response_model=ContactNotesResponse)
+async def update_contact_notes(
+    contact_id: str,
+    body: ContactNotesUpdate,
+    request: Request,
+    db: Optional[Session] = Depends(get_db),
+) -> ContactNotesResponse:
+    session = _ensure_db(db)
+    cid = _parse_contact_id(contact_id)
+
+    try:
+        contact = (
+            session.query(EnhancedClient)
+            .filter(EnhancedClient.id == cid)
+            .with_for_update()
+            .first()
+        )
+        if not contact:
+            raise HTTPException(status_code=404, detail="Contact not found")
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.exception("Failed to validate contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to update notes") from exc
+
+    now = datetime.utcnow()
+    note = ContactNote(contact_id=cid, body=body.notes, created_at=now)
+    session.add(note)
+    try:
+        session.flush()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.exception("Failed to persist note for contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to update notes") from exc
+
+    # Bump denormalized last_activity
+    timestamps = [ts for ts in (contact.last_activity_at, now) if ts]
+    contact.last_activity_at = max(timestamps) if timestamps else now
+
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    event_payload = json.dumps(
+        {"contact_id": cid, "note_id": note.id, "request_id": request_id},
+        separators=(",", ":"),
+    )
+    audit = AuditLog(
+        user_id=None,
+        event_type="contact.notes.update",
+        event_data=event_payload,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        contact_id=cid,
+        occurred_at=now,
+        success=True,
+    )
+    session.add(audit)
+
+    try:
+        session.commit()
+        session.refresh(note)
+    except SQLAlchemyError as exc:
+        session.rollback()
+        logger.exception("Failed to finalize notes update for contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to update notes") from exc
+
+    return ContactNotesResponse(
+        id=str(cid),
+        notes=note.body,
+        updatedAt=_to_iso(note.created_at) or _to_iso(now) or now.isoformat() + "Z",
+    )
+
+
+def _collect_activity_items(
+    cid: int,
+    session: Session,
+    window: int,
+) -> List[Tuple[datetime, ActivityItem]]:
+    events: List[Tuple[datetime, ActivityItem]] = []
+
+    activities = (
+        session.query(ContactActivity)
+        .filter(ContactActivity.contact_id == cid)
+        .order_by(ContactActivity.occurred_at.desc())
+        .limit(window)
+        .all()
+    )
+    for row in activities:
+        when = row.occurred_at
+        events.append(
+            (
+                when,
+                ActivityItem(
+                    id=f"activity-{row.id}",
+                    type=row.kind,
+                    at=_to_iso(when) or "",
+                    text=row.summary,
+                ),
+            )
+        )
+
+    notes = (
+        session.query(ContactNote)
+        .filter(ContactNote.contact_id == cid)
+        .order_by(ContactNote.created_at.desc())
+        .limit(window)
+        .all()
+    )
+    for row in notes:
+        when = row.created_at
+        events.append(
+            (
+                when,
+                ActivityItem(
+                    id=f"note-{row.id}",
+                    type="note",
+                    at=_to_iso(when) or "",
+                    text=row.body,
+                ),
+            )
+        )
+
+    followups = (
+        session.query(FollowUpModel)
+        .filter(FollowUpModel.contact_id == cid)
+        .order_by(FollowUpModel.created_at.desc().nullslast())
+        .limit(window)
+        .all()
+    )
+    for row in followups:
+        when = row.created_at or row.due_at
+        text = row.notes or f"{row.channel.title()} follow-up scheduled"
+        events.append(
+            (
+                when,
+                ActivityItem(
+                    id=f"followup-{row.id}",
+                    type="followup",
+                    at=_to_iso(when) or _to_iso(row.due_at) or "",
+                    text=text,
+                ),
+            )
+        )
+
+    audits = (
+        session.query(AuditLog)
+        .filter(
+            AuditLog.contact_id == cid,
+            AuditLog.event_type == "contact.notes.update",
+        )
+        .order_by(AuditLog.occurred_at.desc())
+        .limit(window)
+        .all()
+    )
+    for row in audits:
+        when = row.occurred_at
+        info = ""
+        try:
+            payload = json.loads(row.event_data or "{}")
+            request_id = payload.get("request_id")
+            if request_id:
+                info = f" (request {request_id})"
+        except (TypeError, ValueError):
+            info = ""
+        events.append(
+            (
+                when,
+                ActivityItem(
+                    id=f"audit-{row.id}",
+                    type="audit",
+                    at=_to_iso(when) or "",
+                    text=f"Notes updated{info}",
+                ),
+            )
+        )
+
+    return events
 
 
 @router.get("/contacts/{contact_id}/activity", response_model=List[ActivityItem])
-async def get_contact_activity(contact_id: str) -> List[ActivityItem]:
-    if contact_id not in _CONTACTS:
-        raise HTTPException(status_code=404, detail="Contact not found")
-    return _ACTIVITY.get(contact_id, [])
+async def get_contact_activity(
+    contact_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Optional[Session] = Depends(get_db),
+) -> List[ActivityItem]:
+    session = _ensure_db(db)
+    cid = _parse_contact_id(contact_id)
 
+    try:
+        exists = (
+            session.query(EnhancedClient.id)
+            .filter(EnhancedClient.id == cid)
+            .first()
+        )
+        if not exists:
+            raise HTTPException(status_code=404, detail="Contact not found")
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to validate contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to load activity") from exc
+
+    window = limit + offset
+    try:
+        events = _collect_activity_items(cid, session, window * 2)
+    except SQLAlchemyError as exc:
+        logger.exception("Failed to gather activity for contact %s", contact_id)
+        raise HTTPException(status_code=500, detail="Failed to load activity") from exc
+
+    events.sort(key=lambda item: item[0] or datetime.utcnow(), reverse=True)
+    sliced = events[offset : offset + limit]
+    return [entry for _, entry in sliced]

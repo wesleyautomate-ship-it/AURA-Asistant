@@ -1,0 +1,4 @@
+# Optional heavy ML dependencies (install with `pip install -r backend/extras-ml.txt`)
+prophet==1.1.5
+tensorflow==2.15.1
+torch==2.3.1

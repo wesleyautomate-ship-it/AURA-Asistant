@@ -39,3 +39,11 @@ class BrochureDraftOut(BaseModel):
     download_url: Optional[str]
     created_at: str
     updated_at: str
+
+
+class BrochureTemplateOut(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    file_path: str
+    created_at: str

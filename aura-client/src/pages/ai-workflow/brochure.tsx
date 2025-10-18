@@ -2,14 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, FileText } from 'lucide-react';
 import { brochureDraftService, mapTemplateIdToKey } from '../../services/brochureDrafts';
+import { listTemplates, type BrochureTemplateOut } from '../../features/brochure/api/brochure';
 
 export default function AIWorkflowBrochure() {
   const navigate = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<BrochureTemplateOut[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    document.title = 'Brochure Templates — Aura';
+    document.title = 'Brochure Templates – Aura';
     const t = setTimeout(() => headingRef.current?.focus(), 0);
+    (async () => {
+      try {
+        const data = await listTemplates();
+        setTemplates(data);
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load templates');
+        setTemplates([]);
+      }
+    })();
     return () => clearTimeout(t);
   }, []);
   return (
@@ -25,11 +37,16 @@ export default function AIWorkflowBrochure() {
           </div>
         </div>
         <section className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {BROCHURE_TEMPLATES.map(t => (
-              <TemplateCard key={t.id} selected={selected === t.id} onSelect={() => setSelected(t.id)} title={t.title} desc={t.desc} />
-            ))}
-          </div>
+          {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{error}</div>}
+          {!templates && <div className="text-sm text-gray-600">Loading templates…</div>}
+          {templates && templates.length === 0 && <div className="text-sm text-gray-600">No templates available.</div>}
+          {templates && templates.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {templates.map(t => (
+                <TemplateCard key={t.id} selected={selected === t.id} onSelect={() => setSelected(t.id)} title={t.name} desc={t.description || ''} />
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -60,12 +77,6 @@ export default function AIWorkflowBrochure() {
     </div>
   );
 }
-
-const BROCHURE_TEMPLATES = [
-  { id: 'clean', title: 'Clean Minimal', desc: 'Light, modern brochure with focus on imagery.' },
-  { id: 'luxury', title: 'Luxury Showcase', desc: 'Premium layout for high-end properties.' },
-  { id: 'neighborhood', title: 'Neighborhood Highlight', desc: 'Area highlights with local amenities.' },
-];
 
 function TemplateCard({ title, desc, selected, onSelect }: { title: string; desc: string; selected: boolean; onSelect: () => void }) {
   return (

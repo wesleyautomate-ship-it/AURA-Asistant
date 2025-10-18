@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { brochureDraftService } from '../../services/brochureDrafts';
+import { listDrafts, type BrochureDraftOut } from '../../features/brochure/api/brochure';
 import type { BrochureDraft } from '../../types/brochure';
 
 export default function BrochureEditor() {
@@ -10,6 +11,7 @@ export default function BrochureEditor() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [draft, setDraft] = useState<BrochureDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<BrochureDraftOut[] | null>(null);
 
   useEffect(() => {
     document.title = 'Brochure Editor — Aura';
@@ -29,6 +31,17 @@ export default function BrochureEditor() {
     })();
   }, [draftId]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const items = await listDrafts(10, 0);
+        setHistory(items);
+      } catch {
+        setHistory([]);
+      }
+    })();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-blue-50">
       <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6">
@@ -42,7 +55,8 @@ export default function BrochureEditor() {
           </div>
         </div>
 
-        <section className="mt-4">
+        <section className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{error}</div>
           )}
@@ -57,9 +71,26 @@ export default function BrochureEditor() {
           ) : !error ? (
             <div className="text-sm text-gray-600">Loading draft…</div>
           ) : null}
+          </div>
+          <aside className="md:col-span-1">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="text-sm font-semibold text-gray-900 mb-2">Recent Brochures</div>
+              {!history && <div className="text-xs text-gray-600">Loading…</div>}
+              {history && history.length === 0 && <div className="text-xs text-gray-600">No recent drafts.</div>}
+              {history && history.length > 0 && (
+                <ul className="space-y-2">
+                  {history.map(h => (
+                    <li key={h.id} className="text-xs text-gray-700 flex items-center justify-between">
+                      <span className="truncate" title={h.id}>{h.id.slice(0, 8)}…</span>
+                      <span className={`ml-2 px-2 py-0.5 rounded ${h.status === 'ready' ? 'bg-green-50 text-green-700' : h.status === 'rendering' ? 'bg-blue-50 text-blue-700' : h.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'}`}>{h.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside>
         </section>
       </div>
     </div>
   );
 }
-

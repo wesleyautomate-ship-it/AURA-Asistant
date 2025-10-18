@@ -20,6 +20,7 @@ from .models import User, UserSession, Role, Permission, AuditLog
 from .utils import verify_jwt_token, sanitize_input
 from .rate_limiter import RateLimiter
 from .dev_auth_bypass import is_development_mode, get_dev_user
+from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,9 @@ security = HTTPBearer()
 
 # Rate limiter instance
 rate_limiter = RateLimiter()
+
+settings = get_settings()
+_dev_bypass_warned = False
 
 
 class AuthMiddleware:
@@ -145,7 +149,11 @@ def get_current_user(
         HTTPException: If authentication fails
     """
     # Development bypass for testing - works without credentials
-    if is_development_mode():
+    if settings.DEV_AUTH_ALLOW and is_development_mode():
+        global _dev_bypass_warned
+        if not _dev_bypass_warned:
+            logger.warning("DEV AUTH BYPASS ENABLED  FOR DEVELOPMENT ONLY")
+            _dev_bypass_warned = True
         logger.info("[DEV_AUTH] Development mode authentication bypass active")
         dev_user_data = get_dev_user("admin")  # Default to admin for development
         if dev_user_data:

@@ -13,6 +13,7 @@ Features:
 """
 
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Depends
@@ -25,7 +26,14 @@ except ImportError:
     # For older versions of PyJWT
     from jwt import InvalidTokenError as JWTError
 
-from .settings import SECRET_KEY, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from .settings import (
+    SECRET_KEY,
+    JWT_ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    get_settings,
+)
+
+logger = logging.getLogger(__name__)
 
 # Simplified imports to avoid circular dependencies
 # from .database import get_db
@@ -64,18 +72,27 @@ DEV_USERS = {
 }
 
 
+def _dev_auth_enabled() -> bool:
+    return bool(getattr(get_settings(), "DEV_AUTH_ALLOW", False))
+
+
 def is_development_mode() -> bool:
     """Check if we're running in development mode"""
+    if not _dev_auth_enabled():
+        return False
+
     # Check DISABLE_AUTH flag first (for explicit bypass)
     disable_auth = os.getenv("DISABLE_AUTH", "false").lower() in ("true", "1", "yes")
     if disable_auth:
-        print(f"[DEV_AUTH] DISABLE_AUTH is set, returning True")
+        logger.info("[DEV_AUTH] DISABLE_AUTH is set, returning True")
         return True
 
     environment = os.getenv("ENVIRONMENT", "development")
     debug = os.getenv("DEBUG", "False").lower() == "true"
     result = environment in ["development", "docker"] or debug
-    print(f"[DEV_AUTH] Environment: {environment}, Debug: {debug}, Result: {result}")
+    logger.debug(
+        "[DEV_AUTH] Environment=%s Debug=%s Result=%s", environment, debug, result
+    )
     return result
 
 

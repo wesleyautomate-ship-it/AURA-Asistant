@@ -248,6 +248,7 @@ class EnhancedClient(Base):
     communication_history = Column(JSON, default=list)
     preferences = Column(JSON, default=dict)
     documents = Column(JSON, default=list)
+    last_activity_at = Column(DateTime, index=True)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -262,6 +263,66 @@ class EnhancedClient(Base):
 
     def __repr__(self):
         return f"<EnhancedClient(id={self.id}, name='{self.name}', client_type='{self.client_type}')>"
+
+
+class ContactNote(Base):
+    """Free-form notes attached to a client (contact)."""
+
+    __tablename__ = "contact_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=func.now(), index=True, nullable=False)
+
+    # Relationships
+    contact = relationship("EnhancedClient", backref="notes")
+
+
+class ContactActivity(Base):
+    """Activity timeline for a client (contact)."""
+
+    __tablename__ = "activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
+    kind = Column(String(20), nullable=False)  # call, email, whatsapp, meeting, ai
+    occurred_at = Column(DateTime, nullable=False, index=True)
+    summary = Column(Text, nullable=False)
+
+    # Relationships
+    contact = relationship("EnhancedClient", backref="activities")
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind in ('call','email','whatsapp','meeting','ai')",
+            name="ck_activities_kind",
+        ),
+    )
+
+
+class FollowUp(Base):
+    """Scheduled follow-up for a client (contact)."""
+
+    __tablename__ = "followups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
+    channel = Column(String(20), nullable=False)  # call, email, whatsapp, meeting
+    due_at = Column(DateTime, nullable=False, index=True)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    status = Column(String(20), nullable=False, default="scheduled")
+
+    # Relationships
+    contact = relationship("EnhancedClient", backref="followups")
+
+    __table_args__ = (
+        CheckConstraint(
+            "channel in ('call','email','whatsapp','meeting')",
+            name="ck_followups_channel",
+        ),
+    )
 
 
 class MarketData(Base):

@@ -1,250 +1,347 @@
+Root: AURA-Asistant
 
+Frontend: aura-client (Vite/React/TS)
 
-**Overall goal:**
-Make the Contacts feature fully end-to-end with a real FastAPI backend while preserving the existing mock mode. Use the smallest viable set of backend routes and switch the frontend to those routes when `VITE_USE_REAL_API=true`. Maintain existing UI styling and component organization.
+Backend: backend (FastAPI, Python)
 
----
+Database: use whatever exists; if nothing is wired, default to SQLAlchemy + Alembic; dev DB can be SQLite; allow Postgres via env.
 
-### 0) Ground rules (follow strictly)
+Feature under test
+Contacts: list → detail → AI actions (compose follow-up, summarize notes, recommend properties, next best action) → schedule follow-up → activity timeline → persistence.
 
-1. **Search before creating**: if a file already exists with similar logic, **modify it**, do not create duplicates.
-2. **Keep mock mode**: do not delete existing mocks—guard real calls behind `VITE_USE_REAL_API`.
-3. **Follow the existing structure & style**:
+0) Rules (must follow)
 
-   * Frontend: keep components in their current folders (`components/contacts`, `components/ai`, etc.).
-   * Backend: add small route modules under `backend/app/routes/` and include them in `app/main.py`.
-4. **Type safety & UX**: add loading, empty, and error states where missing; keep spacing/paddings consistent with current screenshots.
-5. **Activity refresh**: when a follow-up is saved/scheduled, the Activity timeline should show it immediately (optimistic update or refetch).
-6. **No breaking changes**: all new code should be additive and guarded by flags.
+Audit first. Only add code where missing. If similar code exists, modify it—no duplicates.
 
----
+Keep mock mode. Real API is gated by VITE_USE_REAL_API=true; mocks remain when false.
 
-### 1) Backend – add minimal routes (only if missing)
+Database first-class. If models/migrations exist, reuse; otherwise scaffold minimal schema + migrations.
 
-**Inspect first**: search `backend/app` for any existing contacts/followups/ai routes and reuse if present.
+Deterministic tests. All tests must run green locally and in CI with an ephemeral DB (SQLite or Postgres in Docker).
 
-* Create/verify `backend/app/routes/contacts.py` with:
+Clear outputs. Produce a single audit-results.json plus runnable tests and a short RUN.md.
 
-  * `GET /contacts` → brief list (id, name, temperature/status, lastActivityAt, avatarUrl?).
-  * `GET /contacts/{contact_id}` → detail (notes, intentScore, signals).
-  * `GET /contacts/{contact_id}/activity` → list of timeline items (id, type: `call|email|ai|whatsapp|meeting`, at ISO string, text).
-  * Use a small **in-memory store** (dict/lists) for now. Add TODO about replacing with DB later.
+1) Repository Inventory (read-only)
 
-* Create/verify `backend/app/routes/followups.py` with:
+Scan and list all files related to Contacts/AI/DB:
 
-  * `GET /followups?contactId={id}` → list.
-  * `POST /followups` → create; body includes: `id`, `contactId`, `channel`, `dueAt`, `notes?`, `createdAt`.
-  * Append to in-memory list and return created item.
+Frontend:
 
-* Create/verify `backend/app/routes/ai_contacts.py` with:
+src/pages/**, src/routes/**
 
-  * `POST /ai/followup` → returns `{ draft: string }`. Accept `{ contactId, tone, goal }`.
-  * `POST /ai/summarize` → returns `{ summary: string }`.
-  * `GET /ai/next-best-action?contactId=` → returns `{ title, detail }`.
-  * `GET /ai/recommend?contactId=` → returns `{ items: Array<{id,title,area,price,route}> }`.
-  * For now, return deterministic mock data; later can call orchestrator.
+src/components/contacts/**, src/components/ai/**
 
-* Wire routes in `backend/app/main.py`:
+src/services/** (contactsApi.ts, aiClient.ts, schedulesApi.ts, orchestratorService.ts)
 
-  ```python
-  from .routes import contacts, followups, ai_contacts
-  app.include_router(contacts.router)
-  app.include_router(followups.router)
-  app.include_router(ai_contacts.router)
-  ```
+src/types/**, src/state/**, src/hooks/**
 
-* If CORS is not already enabled for the frontend origin, add permissive CORS middleware for dev.
+Backend:
 
-* Ensure `GET /healthz` and `GET /version` stay intact.
+app/main.py, app/api/**, app/routes/**, app/models/**, app/db/**, app/schemas/**, app/services/**
 
-**Acceptance checks (backend):**
+Alembic config & migrations (if present)
 
-* `uvicorn app.main:app --reload` boots with no import errors.
-* Hitting `/contacts` returns 200 JSON list.
-* Hitting `/ai/followup` with a body returns a draft string.
+Database:
 
----
+ORM models, migrations, seed scripts, .env*, docker-compose*
 
-### 2) Frontend – HTTP helper & env gate
+Deliverable: Put a structured list in audit-results.json.INVENTORY.
 
-**Inspect first**: look for an existing HTTP client or env flags. If present, extend it instead of creating a new file.
+2) Database Audit & Plan
 
-* If not present, add `aura-client/src/services/http.ts`:
+If DB already exists:
 
-  ```ts
-  const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-  const USE_REAL = (import.meta.env.VITE_USE_REAL_API === 'true');
+Enumerate tables, columns, types, constraints, FKs, indexes.
 
-  export const api = {
-    enabled: USE_REAL,
-    async get<T>(path: string, signal?: AbortSignal): Promise<T> {
-      const r = await fetch(`${BASE}${path}`, { signal, headers: { 'Authorization': `Bearer ${import.meta.env.VITE_DEV_AUTH_TOKEN || 'dev'}` } });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json() as Promise<T>;
-    },
-    async post<T>(path: string, body: any): Promise<T> {
-      const r = await fetch(`${BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_DEV_AUTH_TOKEN || 'dev'}` },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error(await r.text());
-      return r.json() as Promise<T>;
-    },
-  };
-  ```
+Map to domain entities: contacts, contact_notes, activities, followups, optional properties.
 
-* Update `.env.example` (and your local `.env`) to include:
+Verify migrations are present and reversible.
 
-  ```
-  VITE_API_BASE_URL=http://localhost:8000
-  VITE_USE_REAL_API=true
-  VITE_AURA_MOCK_MODE=false
-  VITE_DEV_AUTH_TOKEN=dev
-  ```
+Identify gaps: missing indexes on lookups (contact_id, created_at), missing FKs, nullable fields that shouldn’t be, lack of soft-delete/versioning, etc.
 
----
+If DB not present or incomplete:
 
-### 3) Frontend – services: prefer real API when enabled
+Scaffold SQLAlchemy models and Alembic migrations implementing the minimal schema below.
 
-**Inspect first**: open these files if they exist and modify in place; if files differ, adapt paths accordingly.
+Add seed script with small realistic dataset.
 
-* `aura-client/src/services/contactsApi.ts`
-  Add gated calls:
+Minimal schema (adapt names to match repo conventions if different):
 
-  ```ts
-  import { api } from './http';
-  import type { Contact, ContactDetail } from '../types/contacts'; // reuse existing types if present
+contacts (
+  id UUID/PK,
+  full_name TEXT NOT NULL,
+  email TEXT NULL UNIQUE,
+  phone TEXT NULL,
+  status TEXT NOT NULL CHECK(status IN ('New','Active','Warm','Cold')),
+  intent_score INTEGER NOT NULL DEFAULT 50,
+  last_activity_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-  export async function getContacts(signal?: AbortSignal): Promise<Contact[]> {
-    if (api.enabled) return api.get<Contact[]>('/contacts', signal);
-    // fallback to existing mock
-  }
+contact_notes (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-  export async function getContactDetail(id: string, signal?: AbortSignal): Promise<ContactDetail> {
-    if (api.enabled) return api.get<ContactDetail>(`/contacts/${id}`, signal);
-    // fallback mock
-  }
+activities (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN ('call','email','whatsapp','meeting','ai')),
+  occurred_at TIMESTAMPTZ NOT NULL,
+  summary TEXT NOT NULL
+);
+CREATE INDEX idx_activities_contact_time ON activities(contact_id, occurred_at DESC);
 
-  export async function getActivity(id: string, signal?: AbortSignal) {
-    if (api.enabled) return api.get(`/contacts/${id}/activity`, signal);
-    // fallback mock/empty
-  }
-  ```
+followups (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK(channel IN ('call','email','whatsapp','meeting')),
+  due_at TIMESTAMPTZ NOT NULL,
+  notes TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_followups_contact_due ON followups(contact_id, due_at);
 
-* `aura-client/src/services/aiClient.ts`
 
-  ```ts
-  import { api } from './http';
+Deliverables:
 
-  export async function generateFollowUp(contactId: string, opts?: { tone?: string; goal?: string }) {
-    if (api.enabled) return (await api.post<{draft:string}>('/ai/followup', { contactId, ...opts })).draft;
-    // fallback existing mock
-  }
+backend/app/models/*.py (or update existing)
 
-  export async function summarizeNotes(contactId: string) {
-    if (api.enabled) return (await api.post<{summary:string}>('/ai/summarize', { contactId })).summary;
-    // fallback
-  }
+Alembic migration(s) creating the tables & indexes
 
-  export async function recommendProperties(contactId: string) {
-    if (api.enabled) return (await api.get<{items:any[]}>(`/ai/recommend?contactId=${contactId}`)).items;
-    // fallback
-  }
+backend/scripts/seed_contacts.py to insert 5–10 contacts + related rows
 
-  export async function nextBestAction(contactId: string) {
-    if (api.enabled) return api.get<{title:string; detail:string}>(`/ai/next-best-action?contactId=${contactId}`);
-    // fallback
-  }
-  ```
+Section in audit-results.json.DB_AUDIT describing current vs target
 
-* `aura-client/src/services/schedulesApi.ts`
+3) Backend Routes & Contracts
 
-  ```ts
-  import { api } from './http';
-  export interface FollowUpItem { id: string; contactId: string; channel: 'call'|'email'|'whatsapp'|'meeting'; dueAt: string; notes?: string; createdAt: string; }
+Discover and document all relevant endpoints:
 
-  export async function listFollowUps(contactId: string, signal?: AbortSignal): Promise<FollowUpItem[]> {
-    if (api.enabled) return api.get(`/followups?contactId=${contactId}`, signal);
-    // fallback to localStorage implementation
-  }
+/contacts (GET list)
 
-  export async function createFollowUp(item: FollowUpItem): Promise<FollowUpItem> {
-    if (api.enabled) return api.post('/followups', item);
-    // fallback to localStorage
-  }
-  ```
+/contacts/{id} (GET detail)
 
----
+/contacts/{id}/activity (GET)
 
-### 4) Frontend – wire UI states & activity refresh
+/followups?contactId=... (GET), /followups (POST)
 
-**Inspect first**: locate the Contact Detail page (commonly `src/pages/contacts/[id].tsx` or similar). Update there:
+/ai/followup (POST), /ai/summarize (POST), /ai/next-best-action (GET), /ai/recommend (GET)
 
-* **AI Actions**: Ensure:
+If missing, add minimal FastAPI routers under backend/app/routes/ with pydantic schemas, backed by DB queries:
 
-  * `onGenerateFollowUp` calls `generateFollowUp(contactId)` and fills the draft textarea.
-  * `onScheduleFollowUp` calls `createFollowUp({...})`.
+List endpoints must support pagination: ?limit&offset (defaults 20/0).
 
-* **Loading / Empty / Error**:
+Ensure CORS allows the dev frontend origin.
 
-  * For Recommendations and Next Best Action cards, add:
+Keep existing health/version endpoints untouched.
 
-    * skeleton when loading,
-    * “No recommendations yet” empty state when arrays are empty and not loading,
-    * inline error state if fetch fails.
+Deliverables:
 
-* **Activity timeline refresh**:
+Updated/created routers
 
-  * After `createFollowUp`, do either:
+Pydantic request/response models
 
-    * **Optimistic insert** into the Activity list with the same shape as `/contacts/{id}/activity`, or
-    * `await refetch()` of `getActivity(contactId)`.
-  * Keep item visuals consistent (icon by type, relative time like “3h ago”).
+Added app.include_router(...) in main.py
 
-* **Back label**:
+Section audit-results.json.BACKEND_AUDIT with route table and sample payloads
 
-  * In the contact header component, add subtle text next to the chevron: “Back to Contacts”.
+4) Frontend Service Contracts
 
-* **FAB behavior**:
+Audit and document each service function (method, URL, request, response). Ensure a single HTTP helper (create one if missing) that respects:
 
-  * Keep the FAB but ensure its click opens the contextually correct composer. Add an aria-label like `"Add follow-up"` for accessibility.
+VITE_API_BASE_URL
 
----
+VITE_USE_REAL_API (gate)
 
-### 5) Run & test (must pass)
+Auth header placeholder VITE_DEV_AUTH_TOKEN (optional)
 
-1. **Backend**: `cd backend && uvicorn app.main:app --reload`
-2. **Frontend**: `cd aura-client && pnpm dev` (or yarn/npm) with `VITE_USE_REAL_API=true`.
-3. **Manual QA**:
+If the repo already has services, do not duplicate; adapt them to call the new backend when VITE_USE_REAL_API=true, otherwise keep mocks.
 
-   * Contacts list loads from `/contacts`.
-   * Click a contact → detail loads `/contacts/{id}`.
-   * **Follow-Up** → draft from `/ai/followup` → **Save** → POST `/followups` and timeline updates.
-   * **Schedule** (any channel) → creates follow-up → timeline shows without full page reload.
-   * **Summarize Notes** → `/ai/summarize` populates bottom sheet with “Summarizing…” progress then content.
-   * **Recommend Properties** → `/ai/recommend` card list displays; empty state is graceful.
-   * **Next Best Action** → `/ai/next-best-action` card displays with title + detail.
-   * Toggle `VITE_USE_REAL_API=false` → app falls back to mocks without errors.
+Deliverables:
 
----
+Updated services in aura-client/src/services/*
 
-### 6) Deliverables (create/update this checklist in `docs/contacts-e2e.md`)
+audit-results.json.FRONTEND_AUDIT with a contracts table
 
-* [ ] Routes added & included in `backend/app/main.py`
-* [ ] Real API client + env flag in `aura-client/src/services/http.ts`
-* [ ] `contactsApi.ts`, `aiClient.ts`, `schedulesApi.ts` gated to real API
-* [ ] Loading/empty/error states added to AI cards
-* [ ] Activity refresh on create follow-up
-* [ ] Smoke test passed with real backend
-* [ ] Mock mode still works when re-enabled
+5) Contract Tests (type-safe)
 
----
+Generate a contract layer that fails the build if backend responses drift:
 
-### 7) Notes
+Export backend OpenAPI (/openapi.json from FastAPI).
 
-* If any file paths differ in this repo, **adapt to existing structure** instead of forcing new ones.
-* Keep code concise and idiomatic (TypeScript strict, FastAPI pydantic models).
-* Ensure all new modules are lint-clean and build passes.
+Generate TS types with openapi-typescript into aura-client/src/types/api.d.ts.
 
+Replace any hand-rolled response types with these.
 
+Add a contract test that imports a few representative response samples and asserts assignability (or use runtime zod parsing, if zod exists).
+
+Deliverables:
+
+scripts/generate-types.sh
+
+aura-client/src/types/api.d.ts (git-tracked)
+
+aura-client/src/tests/contract/openapi-types.spec.ts
+
+6) Automated Tests
+6a) Backend: pytest (unit + integration)
+
+Create/extend tests under backend/tests/ using pytest and httpx.AsyncClient against the real FastAPI app with a temp DB:
+
+DB fixtures: spin up SQLite in-memory or a temporary Postgres (if docker-compose exists); run Alembic migrations, seed minimal fixtures.
+
+Contacts
+
+GET /contacts returns list, sortable by last_activity_at, paginated.
+
+GET /contacts/{id} returns detail and notes snippet.
+
+GET /contacts/{id}/activity returns descending activities.
+
+Followups
+
+POST /followups creates, persists, and can be fetched via GET /followups?contactId=....
+
+Validation errors for past due_at.
+
+AI endpoints (can be stubbed): return deterministic content and 200.
+
+File examples to generate (adjust paths if repo differs):
+
+backend/tests/conftest.py
+backend/tests/test_contacts_routes.py
+backend/tests/test_followups_routes.py
+backend/tests/test_ai_contacts_routes.py
+
+6b) Frontend: unit/integration (Vitest)
+
+Create tests that mock network calls (MSW) when VITE_USE_REAL_API=false and hit the real backend when true (flag controlled in test env):
+
+Contact list renders rows, filters by chip, shows skeletons.
+
+Contact detail loads intent score, signals, notes textarea autosave (debounced).
+
+Follow-up flow: open composer → generate draft (mocked) → save → scheduler modal appears → create follow-up → activity list updates (optimistic or refetch).
+
+Files:
+
+aura-client/src/__tests__/ContactsList.spec.tsx
+aura-client/src/__tests__/ContactDetail.spec.tsx
+aura-client/src/__tests__/FollowUpFlow.spec.tsx
+
+6c) E2E: Playwright (recommended)
+
+Add Playwright tests to drive the whole app against the dev backend (SQLite):
+
+Scenarios:
+
+Happy path: load list → open contact → generate follow-up → schedule for “Call” tomorrow → see item in “Activity”.
+
+AI summary: open summary → loading shimmer appears → summary text rendered.
+
+Recommendations: shows cards or empty state.
+
+Resilience: simulate 500 on AI endpoint and verify user sees inline error with retry.
+
+Files:
+
+aura-client/e2e/playwright.config.ts
+aura-client/e2e/contacts.e2e.spec.ts
+
+6d) Performance smoke: k6 (optional but add)
+
+Create a simple k6 script hitting /contacts and /contacts/{id} with 50 VUs for 30s and assert p95 < 300ms on dev machine.
+
+Files:
+
+perf/k6/contacts-smoke.js
+
+7) Seed & Runbook
+
+Add:
+
+backend/scripts/seed_contacts.py (idempotent)
+
+RUN.md at repo root with:
+
+Dev: start DB (if Postgres via docker-compose), run backend (uvicorn), run frontend (Vite), load .env examples
+
+Migrate: alembic upgrade head
+
+Seed: python backend/scripts/seed_contacts.py
+
+Tests: backend pytest -q, frontend pnpm test, e2e pnpm exec playwright test
+
+Contracts: ./scripts/generate-types.sh before frontend build
+
+Perf: k6 run perf/k6/contacts-smoke.js
+
+Add .env.example entries:
+
+# Frontend
+VITE_API_BASE_URL=http://localhost:8000
+VITE_USE_REAL_API=false
+VITE_DEV_AUTH_TOKEN=dev
+
+# Backend
+DATABASE_URL=sqlite:///./dev.db
+# or: postgresql+psycopg://postgres:postgres@localhost:5432/aura
+ALLOWED_ORIGINS=http://localhost:5173
+
+8) CI (GitHub Actions)
+
+If .github/workflows exists, extend; else create ci.yml:
+
+Checkout → setup Python + Node
+
+Cache deps
+
+Spin Postgres service (if using Postgres) or use SQLite
+
+Run Alembic migrations
+
+Run backend tests
+
+Run contract type generation
+
+Run frontend unit tests
+
+(Optional) Run Playwright with headed=false
+
+9) Acceptance Matrix (auto-filled)
+
+Output a table like this in audit-results.json.ACCEPTANCE_MATRIX with ✅/⚠️/❌ and notes:
+
+Scenario	Contracts Match	Works Mock	Works Real DB	UX States Complete	Perf OK
+Load Contacts					
+Contact Detail					
+Generate Draft					
+Schedule Follow-Up					
+Activity Refresh					
+AI Summary					
+Recommendations					
+Next Best Action					
+10) Final Outputs to produce
+
+audit-results.json containing:
+
+INVENTORY, DB_AUDIT, BACKEND_AUDIT, FRONTEND_AUDIT,
+
+CONTRACTS (where the generated TS types live),
+
+TESTS_SUMMARY (counts of tests & pass/fail),
+
+ACCEPTANCE_MATRIX,
+
+GAPS (ordered list with fix suggestions),
+
+TOP_5_FIXES (short bullets).
+
+Files & folders added/updated as described above (tests, migrations, seeds, scripts, CI, docs).
+
+Zero test failures when running all suites locally with SQLite.
+
+Important: Do not break existing functionality. Prefer minimal, targeted changes. Where you add code, keep style consistent with the repo (naming, lint rules, UI spacing).

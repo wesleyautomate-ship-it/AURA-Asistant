@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -161,4 +161,29 @@ def get_download(draft_id: str, db: Session = Depends(get_db)) -> Dict[str, str]
     if not row.download_url:
         raise HTTPException(status_code=404, detail="Download not available")
     return {"download_url": row.download_url}
-
+@router.get("", response_model=list[BrochureDraftOut])
+def list_brochures(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> list[BrochureDraftOut]:
+    rows = (
+        db.query(BrochureDraftModel)
+        .order_by(BrochureDraftModel.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    out: list[BrochureDraftOut] = []
+    for row in rows:
+        out.append(
+            BrochureDraftOut(
+                id=row.id,
+                data=row.data,
+                status=row.status,
+                download_url=row.download_url,
+                created_at=row.created_at.isoformat() if row.created_at else "",
+                updated_at=row.updated_at.isoformat() if row.updated_at else "",
+            )
+        )
+    return out

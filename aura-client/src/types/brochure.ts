@@ -5,7 +5,7 @@ export interface BrochureDraft {
   template: BrochureTemplateKey;
   createdAt: string;          // ISO
   updatedAt: string;          // ISO
-  status: 'draft' | 'generating' | 'ready' | 'error';
+  status: 'draft' | 'rendering' | 'generating' | 'ready' | 'error';
   propertyId?: string;
   listingData?: any;          // hydrated property details
   brand?: { logoUrl?: string; primary?: string; secondary?: string };
@@ -13,4 +13,3 @@ export interface BrochureDraft {
   output?: { html?: string; pdfUrl?: string };
   error?: string;
 }
-

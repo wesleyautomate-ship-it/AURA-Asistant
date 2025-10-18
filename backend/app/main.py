@@ -36,17 +36,18 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Union, Dict, Any, Optional
 import os
 import json
+import importlib
 
 try:
     import google.generativeai as genai
 except ImportError:
     logger.warning("Google Generative AI not available - AI features disabled")
     genai = None
-import chromadb
 from sqlalchemy import create_engine, Column, Integer, String, Numeric, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -61,12 +62,13 @@ from werkzeug.utils import secure_filename
 
 # Import from clean architecture structure
 from app.core.settings import get_settings
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.middleware import (
     get_current_user,
     require_roles,
     RequestLoggingMiddleware,
 )
+from app import status
 
 # Import routers from clean architecture
 try:
@@ -157,13 +159,54 @@ except ImportError as e:
     admin_router = None
     admin_ingest_router = None
 
-try:
-    from app.api.v1.report_generation_router import router as report_router
+# Get settings
+settings = get_settings()
 
-    logger.info("Report generation router loaded")
-except ImportError as e:
-    logger.warning(f"Report generation router not loaded: {e}")
-    report_router = None
+# Feature flags -------------------------------------------------------------
+logger.info(
+    "Features: pdf=%s, vector=%s",
+    settings.ENABLE_PDF_WEASYPRINT,
+    settings.ENABLE_VECTOR_CHROMA,
+)
+
+pdf_feature_enabled = False
+if settings.ENABLE_PDF_WEASYPRINT:
+    try:
+        importlib.import_module("weasyprint")
+        pdf_feature_enabled = True
+    except Exception as exc:
+        logger.warning(
+            "PDF feature disabled due to import error: %s",
+            exc,
+        )
+else:
+    logger.info("PDF feature disabled")
+
+vector_feature_enabled = False
+chromadb_module = None
+if settings.ENABLE_VECTOR_CHROMA:
+    try:
+        chromadb_module = importlib.import_module("chromadb")
+        vector_feature_enabled = True
+    except Exception as exc:
+        logger.warning(
+            "Vector/RAG feature disabled due to import error: %s",
+            exc,
+        )
+else:
+    logger.info("Vector/RAG feature disabled")
+
+report_router = None
+if pdf_feature_enabled:
+    try:
+        from app.api.v1.report_generation_router import router as report_router
+
+        logger.info("Report generation router loaded")
+    except ImportError as e:
+        logger.warning(f"Report generation router not loaded: {e}")
+        report_router = None
+else:
+    logger.info("Report generation router skipped (PDF optional features disabled)")
 
 try:
     from app.api.v1.intelligence_router import router as intelligence_router
@@ -174,14 +217,20 @@ except ImportError as e:
     intelligence_router = None
 
 # Import AI services from clean architecture
-try:
-    from app.domain.ai.rag_service import EnhancedRAGService, QueryIntent
+EnhancedRAGService = None
+QueryIntent = None
+if vector_feature_enabled:
+    try:
+        from app.domain.ai.rag_service import EnhancedRAGService, QueryIntent
 
-    logger.info("RAG service loaded")
-except ImportError as e:
-    logger.warning(f"RAG service not loaded: {e}")
-    EnhancedRAGService = None
-    QueryIntent = None
+        logger.info("RAG service loaded")
+    except Exception as e:
+        logger.warning(f"RAG service disabled: {e}")
+        EnhancedRAGService = None
+        QueryIntent = None
+        vector_feature_enabled = False
+else:
+    logger.info("RAG service skipped (vector features disabled)")
 
 try:
     from app.domain.ai.ai_manager import AIEnhancementManager
@@ -200,15 +249,19 @@ except ImportError as e:
     ActionEngine = None
 
 # Import monitoring from clean architecture
-try:
-    from app.infrastructure.integrations.rag_monitoring import (
-        include_rag_monitoring_routes,
-    )
+include_rag_monitoring_routes = None
+if vector_feature_enabled:
+    try:
+        from app.infrastructure.integrations.rag_monitoring import (
+            include_rag_monitoring_routes,
+        )
 
-    logger.info("RAG monitoring loaded")
-except ImportError as e:
-    logger.warning(f"RAG monitoring not loaded: {e}")
-    include_rag_monitoring_routes = None
+        logger.info("RAG monitoring loaded")
+    except Exception as e:
+        logger.warning(f"RAG monitoring disabled: {e}")
+        include_rag_monitoring_routes = None
+else:
+    logger.info("RAG monitoring skipped (vector features disabled)")
 
 # Import async processing from clean architecture
 try:
@@ -220,13 +273,17 @@ except ImportError as e:
     async_router = None
 
 # Import Blueprint 2.0 routers from clean architecture
-try:
-    from app.api.v1.documents_router import router as documents_router
+documents_router = None
+if pdf_feature_enabled:
+    try:
+        from app.api.v1.documents_router import router as documents_router
 
-    logger.info("Documents router loaded")
-except ImportError as e:
-    logger.warning(f"Documents router not loaded: {e}")
-    documents_router = None
+        logger.info("Documents router loaded")
+    except ImportError as e:
+        logger.warning(f"Documents router not loaded: {e}")
+        documents_router = None
+else:
+    logger.info("Documents router skipped (PDF optional features disabled)")
 
 try:
     from app.api.v1.health_router import router as health_v1_router
@@ -276,25 +333,33 @@ except ImportError as e:
     logger.warning(f"ML websocket router not loaded: {e}")
     ml_websocket_router = None
 
-try:
-    from app.api.v1.search_optimization_router import (
-        router as search_optimization_router,
-    )
+search_optimization_router = None
+if vector_feature_enabled:
+    try:
+        from app.api.v1.search_optimization_router import (
+            router as search_optimization_router,
+        )
 
-    logger.info("Search optimization router loaded")
-except ImportError as e:
-    logger.warning(f"Search optimization router not loaded: {e}")
-    search_optimization_router = None
+        logger.info("Search optimization router loaded")
+    except Exception as e:
+        logger.warning(f"Search optimization router disabled: {e}")
+        search_optimization_router = None
+else:
+    logger.info("Search optimization router skipped (vector features disabled)")
 
-try:
-    from app.api.v1.database_enhancement_router import (
-        router as database_enhancement_router,
-    )
+database_enhancement_router = None
+if vector_feature_enabled:
+    try:
+        from app.api.v1.database_enhancement_router import (
+            router as database_enhancement_router,
+        )
 
-    logger.info("Database enhancement router loaded")
-except ImportError as e:
-    logger.warning(f"Database enhancement router not loaded: {e}")
-    database_enhancement_router = None
+        logger.info("Database enhancement router loaded")
+    except Exception as e:
+        logger.warning(f"Database enhancement router disabled: {e}")
+        database_enhancement_router = None
+else:
+    logger.info("Database enhancement router skipped (vector features disabled)")
 
 # Import Phase 3 routers from clean architecture
 try:
@@ -423,9 +488,6 @@ try:
 except ImportError as e:
     logger.warning(f"Some models could not be imported: {e}")
 
-# Get settings
-settings = get_settings()
-
 # Determine AI feature availability
 AI_FEATURES_ENABLED = genai is not None and bool(
     getattr(settings, "google_api_key", None)
@@ -444,6 +506,15 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+logger.info("CORS allowed origins: %s", settings.CORS_ALLOWED_ORIGINS)
+
 # Lightweight version value for dev health checks
 # Prefer a package __version__, otherwise fall back to 'dev'
 VERSION = "dev"
@@ -455,6 +526,37 @@ try:
 except Exception:
     # Keep default VERSION = 'dev'
     pass
+
+# Status endpoints ---------------------------------------------------------
+
+
+@app.get("/healthz")
+async def healthz():
+    """Simple liveness endpoint."""
+    return status.liveness()
+
+
+@app.get("/readyz")
+async def readyz():
+    """Readiness endpoint for orchestrators and load balancers."""
+    configured_store = (
+        getattr(settings, "object_store_path", None)
+        or getattr(settings, "OBJECT_STORE_PATH", None)
+    )
+    object_store_path = Path(configured_store) if configured_store else None
+    payload = status.readiness(SessionLocal, object_store_path)
+    if not payload.get("ok", False):
+        return JSONResponse(payload, status_code=503)
+    return payload
+
+
+@app.get("/version")
+async def version():
+    """Expose build metadata."""
+    return status.version_info()
+
+
+logger.info("Status endpoints ready")
 
 # Helper to register AI-dependent routers with graceful fallback
 def register_ai_router(router, prefix: str, tags: list[str], feature_name: str):
@@ -587,16 +689,28 @@ if documents_router:
     app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
     logger.info("Documents router included")
 
-# Export router (includes mock brochure export)
-try:
-    from app.api.v1.export_router import router as export_router
-    from app.api.v1.brochures_router import router as brochures_router
+# Export / brochure routers (PDF-dependent features)
+if pdf_feature_enabled:
+    try:
+        from app.api.v1.export_router import router as export_router
+        from app.api.v1.brochures_router import router as brochures_router
 
-    app.include_router(export_router, tags=["Export"])
-    app.include_router(brochures_router, tags=["Brochures"])
-    logger.info("Export router included at /api/v1/export")
-except ImportError as e:
-    logger.warning(f"Export router not loaded: {e}")
+        app.include_router(export_router, tags=["Export"])
+        app.include_router(brochures_router, tags=["Brochures"])
+
+        try:
+            from app.api.v1.templates_router import router as templates_router
+
+            app.include_router(templates_router, tags=["Brochures"])
+            logger.info("Templates router included at /api/v1/templates")
+        except ImportError as e:
+            logger.warning(f"Templates router not loaded: {e}")
+
+        logger.info("Export router included at /api/v1/export")
+    except ImportError as e:
+        logger.warning(f"Export router not loaded: {e}")
+else:
+    logger.info("Export/brochure routers skipped (PDF optional features disabled)")
 
 if health_v1_router:
     app.include_router(health_v1_router, prefix="/api/v1", tags=["Health"])
@@ -805,17 +919,6 @@ async def root():
         "health": "/health",
     }
 
-# Minimal dev health endpoint (no auth, no SSE/LLM deps)
-@app.get("/healthz")
-async def dev_healthz():
-    return {"ok": True}
-
-
-# Minimal dev version endpoint
-@app.get("/version")
-async def dev_version():
-    return {"version": VERSION}
-
 
 # ========================================
 # AURA COMMAND CENTER v2.7.1 ROUTERS
@@ -855,3 +958,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

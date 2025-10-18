@@ -1,454 +1,250 @@
-Implement a complete, production-ready Brochure flow (create → pick template → edit content/branding with live preview → render PDF → download/share), using the provided “Brochure template example.pdf” as the visual model. Maintain the app’s existing visual style, spacing, and component patterns from the codebase/screenshots.
+Root: AURA-Asistant
 
-🔎 Very important rule: Before adding ANY new file, search the repo for similar logic or existing helpers and extend/edit them if reasonable. Reuse established patterns (routing, API layer, components, state, toasts, loaders, typography, shadows, spacing). Only create a new file if there is no suitable place to add code.
+Frontend: aura-client
 
-0) Conventions & Pre-flight
+Backend: backend
 
-Search-first: Do a repo-wide search for existing items that match these names/purposes and reuse:
+Database: SQLAlchemy + Alembic or similar (SQLite/Postgres)
 
-API client wrappers (e.g., api/*, services/*, lib/http.ts, useApi.ts).
+Related folders: aura-client/src/components/brochure/**, aura-client/src/services/brochureApi.ts, backend/app/routes/brochure.py, backend/app/services/pdf/**, backend/app/templates/**
 
-Design system primitives (e.g., Button, Card, SectionHeader, Input, Textarea, Tabs/Stepper, Toast/Notifier, Skeleton).
+0) Rules
 
-State management (React Query / Zustand / Redux). Match whatever the app already uses.
+Audit first, code second – only write new code if a feature is missing.
 
-Routing pattern (React Router, file routes, etc.).
+Reuse existing logic before adding anything new.
 
-Backend patterns (FastAPI routers in app/routers, models in app/models, Pydantic schemas in app/schemas, services in app/services, S3/GCS client, PDF/HTML rendering utilities).
+Respect existing design/UX (containers, tiles, buttons, etc.).
 
-Existing asset upload/presign endpoints.
+Keep mock mode (for demo PDFs) but ensure the real pipeline works when VITE_USE_REAL_API=true.
 
-Style: Match existing CSS/tokens and UX flows. Use the same spacing, shadows, rounded radii, fonts, and button sizes. If there’s a component for titles/subtitles/section headers, use it.
+Include database, backend, frontend, and tests.
 
-Fix obvious breaking errors while you’re here:
+All tests must pass locally with SQLite and in CI.
 
-In AIActionBar.tsx (or similar), if onScheduleFollowUp is used, provide a safe default:
+1) Inventory
 
-const AIActionBar = ({ onScheduleFollowUp = () => {} , ...props}) => { ... }
+Scan and list every file relevant to brochure creation:
 
+Frontend:
+src/components/brochure/**, src/pages/**, src/services/brochureApi.ts, src/hooks/useBrochure.ts, src/state/**
 
-Any “open contact” null/undefined path should be guarded (check router params exist before dereferencing; show empty state otherwise).
+Backend:
+app/routes/brochure.py, app/services/pdf/**, app/templates/**, app/models/**
 
-1) Backend — Brochure Draft CRUD + Render
+Database:
+models/tables dealing with brochures, templates, assets
 
-Search-first: Look for existing patterns for CRUD resources (e.g., properties, CMA, templates). If a similar router/scheme exists, extend it. If not, add the following with the app’s naming conventions.
+Assets:
+check static/templates, media/uploads, or similar folders.
 
-1.1 Models & Schemas
+Output ? audit-results.json.INVENTORY.brochure
 
-File (edit existing if similar): backend/app/models/brochure.py
+2) Database Audit & Plan
 
-SQLAlchemy model: BrochureDraft
+If DB models exist:
 
-id: UUID (pk)
+List tables, columns, relationships, indexes.
 
-data: JSONB — stores the whole draft (see schema below)
+Verify foreign keys (brochure.contact_id, brochure.template_id).
 
-status: String in {"draft"|"rendering"|"ready"|"error"}
+Identify missing constraints, indexes, soft-delete flags, etc.
 
-download_url: String | None
+If not:
 
-created_at, updated_at
+Scaffold models and Alembic migrations for:
 
-File (edit existing if similar): backend/app/schemas/brochure.py
+brochure_templates (
+  id UUID/PK,
+  name TEXT NOT NULL,
+  description TEXT NULL,
+  file_path TEXT NOT NULL,        -- PDF or base HTML
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
-Pydantic models: BrochureDraftCreate, BrochureDraftUpdate, BrochureDraftOut
+brochures (
+  id UUID/PK,
+  contact_id FK -> contacts.id,
+  template_id FK -> brochure_templates.id,
+  status TEXT CHECK(status IN ('draft','generating','ready','failed')),
+  pdf_url TEXT NULL,
+  metadata JSONB NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 
-Draft JSON structure (store in data):
 
-{
-  "templateKey": "passo-building-v1",
-  "propertyId": null,
-  "hero": { "title": "", "subtitle": "", "image": { "key": "", "url": "" } },
-  "about": { "heading": "", "body": "", "gallery": [] },
-  "whyInvest": { "bullets": [], "sideQuote": "", "interiorImage": { "key": "", "url": "" } },
-  "paymentPlan": { "items": [ { "label": "", "date": "", "percent": 0 } ], "blurb": "" },
-  "amenities": {
-    "sections": [ { "title": "", "text": "" }, { "title": "", "text": "" }, { "title": "", "text": "" } ],
-    "features": [],
-    "bgImage": { "key": "", "url": "" }
-  },
-  "collections": {
-    "groups": [
-      { "name": "Wellness Collection", "bullets": [], "image": null },
-      { "name": "Residences Collection", "bullets": [], "image": null },
-      { "name": "Elite Collection", "bullets": [], "image": null },
-      { "name": "Penthouses", "bullets": [], "image": null },
-      { "name": "Beach Mansions", "bullets": [], "image": null }
-    ]
-  },
-  "agent": { "name": "", "about": "", "phone": "", "website": "", "company": "", "photo": null },
-  "branding": { "primary": "", "secondary": "", "fontHead": "", "fontBody": "", "logo": null },
-  "meta": { "lastEdited": "", "status": "draft" }
-}
+Include seed script inserting 2-3 sample templates.
 
-1.2 Router (CRUD & Render)
+Output ? audit-results.json.DB_AUDIT.brochure
 
-File (edit existing if similar): backend/app/routers/brochures.py
+3) Backend Routes & Services Audit
 
-POST /brochures → create new draft; body: BrochureDraftCreate.
+Discover all endpoints:
 
-GET /brochures/{id} → fetch one.
+/brochures ? GET list, POST create (trigger generation)
 
-PATCH /brochures/{id} → partial update (BrochureDraftUpdate merges into data).
+/brochures/{id} ? GET detail
 
-POST /brochures/{id}/render → set status="rendering", enqueue job, return { renderId }.
+/brochures/{id}/download ? GET PDF file
 
-GET /brochures/{id}/download → 302/temporary redirects to download_url (signed URL).
+/templates ? GET available templates
 
-Register this router in backend/app/main.py the same way as existing routers.
+/brochures/{id}/status ? GET generation progress (if async)
 
-1.3 Rendering Service
+Verify:
 
-Search for any existing HTML→PDF/Puppeteer/WeasyPrint utilities; reuse if present.
+File creation uses correct PDF library (e.g., reportlab, weasyprint, pdfkit).
 
-If none:
+Template engine merges data correctly (property info, images, etc.).
 
-File: backend/app/services/render_service.py
+Storage – PDFs saved to /media/brochures or S3; URL accessible to frontend.
 
-Function: render_brochure_to_pdf(draft: dict) -> str returns download_url.
+Error handling for invalid template or missing data.
 
-Use headless Chromium (Puppeteer via node service or pyppeteer) or WeasyPrint.
+CORS allows dev frontend.
 
-The render should load a single HTML template that mirrors the final layout; inject draft.data and branding.
+If missing, stub minimal FastAPI routes and PDF generator that outputs dummy PDFs.
 
-File: backend/app/templates/passo-building-v1.html (or Jinja2/React SSR path per existing stack) that matches the PDF structure (see section 3.3 for the layout).
+Output ? audit-results.json.BACKEND_AUDIT.brochure
 
-If project uses a queue/worker, enqueue rendering; otherwise do it in-process with a spinner on the client.
+4) Frontend Audit
 
-1.4 Assets
+Inspect UI flow & data contracts:
 
-Search-first for existing upload endpoints (e.g., /assets, /upload, presigned S3).
+Entry point: Which page or tile launches brochure creation (e.g., “Request Brochure”)?
 
-If none, add POST /assets/presign (or similar) to obtain presigned URL; client uploads directly; returns { key, url }.
+Flow:
 
-2) Frontend — Pages, Sections, Divs, and Exact Placement
+Template selector
 
-Routing pattern: Follow the app’s established routing. The screens live under a Brochure feature.
+Data preview / property merge
 
-2.1 AI Workflow Screen (existing)
+“Generate” button ? progress ? download link
 
-Do not redesign. Add the following behaviors:
+History / list of generated brochures
 
-The Brochure card navigates to /brochure/templates.
+Service calls:
 
-“Recent Drafts” list items navigate to /brochure/{draftId}/review.
+getTemplates(), createBrochure(), getBrochureStatus(), downloadBrochure()
 
-Floating “+” opens a creation modal (if this modal pattern already exists). Else, clicking “+” navigates to /brochure/templates.
+Env flags:
 
-2.2 Templates Screen — BrochureTemplates
+VITE_USE_REAL_API, VITE_API_BASE_URL
 
-File: reuse existing page if present; else aura-client/src/features/brochure/pages/BrochureTemplates.tsx
+UX resilience:
 
-Page structure (top to bottom):
+Loading/success/failure states
 
-Div: PageHeader
+Progress indicators (e.g., spinner, % bar)
 
-Left: h1 “Brochure Templates”
+Disable “Generate” button while running
 
-Subtext: “Choose a template to start”
+Output ? audit-results.json.FRONTEND_AUDIT.brochure
 
-Div: TemplateList (vertical stack of Card components)
-Each TemplateCard contains:
+5) Contract Alignment
 
-Div: Thumbnail (placeholder or generated)
+Compare every frontend service call with backend route:
 
-Div: Body
+method + URL match?
 
-h3 template name (e.g., “Clean Minimal”, “Passo Building”)
+payload/response shapes compatible?
 
-p tagline
+missing or extra fields?
+List discrepancies in audit-results.json.CONTRACTS_MISMATCH.brochure.
 
-Right-aligned Check icon when selected
+6) Automated Tests
+6a) Backend (pytest)
 
-Card click toggles selection; selected card has highlighted border (use existing selected styles).
+Write tests under backend/tests/test_brochure_routes.py:
 
-Div: StickyFooter (bottom, inside safe area)
+GET /templates ? 200 + templates list
 
-Left: Secondary Button: “Start from Blank”
+POST /brochures ? 201 + new record + background PDF generation
 
-Right: Primary Button: “Use Template” (disabled until a card is selected)
+Poll /brochures/{id}/status until ready ? assert file exists
 
-Behavior:
+GET /brochures/{id}/download ? 200 PDF content-type
 
-On “Use Template”: POST /brochures with { templateKey } then route to /brochure/{id}/property.
+Negative tests: invalid template, permission, missing contact.
 
-2.3 Editor Screen — BrochureEditor
+Use tmpdir or SQLite DB fixture. Mock actual PDF writing for speed.
 
-File: reuse if present; else aura-client/src/features/brochure/pages/BrochureEditor.tsx
-URL: /brochure/:id/:tab where :tab ∈ {property,content,branding,review}
+6b) Frontend (Vitest)
 
-Overall page layout (two-column split):
+Add tests for:
 
-Div: PageHeader
+Template selection list renders correctly.
 
-Left: h1 “Brochure Editor”
+Generate button triggers API call and disables while loading.
 
-Subtext: “Step X of 4”
+Success path shows “Download” link.
 
-Div: StepperTabs (existing tab/segment component) with 4 tabs.
+Error path shows toast or inline message.
 
-Div: Body (grid) → LeftPane (inputs) | RightPane (live preview)
+Files:
 
-LeftPane (Inputs Column)
+aura-client/src/__tests__/BrochureFlow.spec.tsx
+aura-client/src/__tests__/BrochureService.spec.ts
 
-Property tab
+6c) E2E (Playwright)
 
-Section: SearchBox (existing Input search)
+Drive through real backend with mock contacts:
 
-Section: PropertyList (existing list style)
+Open Brochure tab ? select template ? click “Generate”.
 
-Section: CTAFooter (sticky within column)
+Wait for status ? “Ready”.
 
-Primary Button “Next →” (disabled until a property is selected)
+Click “Download” ? verify PDF blob header.
 
-Content tab (group by PDF pages):
+Reload ? brochure appears in list/history.
 
-Section: About
+Save under aura-client/e2e/brochure.e2e.spec.ts.
 
-Fields: heading (Input), body (Textarea), gallery[0..1] (Image upload)
+6d) Contract Tests
 
-Section: Why Invest
+Generate TS types from /openapi.json, assert type compatibility for brochure endpoints.
 
-Repeater: bullets (3–5, Input per line), sideQuote (Textarea), interiorImage (Image upload)
+7) Seed & Runbook
 
-Section: Payment Plan
+Add to RUN.md:
 
-Table-like list: {label,date,percent} rows with add/remove
+how to run PDF generator locally (fonts, wkhtmltopdf if used)
 
-Small note (help text): sum to ~100%
+alembic upgrade head
 
-Section: Amenities
+python backend/scripts/seed_brochure_templates.py
 
-Three mini blocks: sections[0..2].{title,text}
+test commands (pytest, pnpm test, pnpm exec playwright test)
 
-Features: multi-select/tag input
+8) CI
 
-Section: Collections
+Extend GitHub Actions to include:
 
-5 grouped bullet lists (name locked, bullets editable), optional image per group
+Run Alembic migrations
 
-Section: Agent
+Run backend & frontend tests
 
-name, about, phone, website, company, photo upload
+Upload generated PDF as artifact for inspection
 
-SectionFooter: “Back” (secondary) | “Next →” (primary)
+9) Acceptance Matrix
+Scenario	Contracts	Works Mock	Works Real	UX States	Perf
+List Templates					
+Generate Brochure					
+Poll Status					
+Download PDF					
+Error Handling					
 
-Branding tab
+Populate with ?/??/? in audit-results.json.ACCEPTANCE_MATRIX.brochure.
 
-Section: Colors (Primary/Secondary color pickers)
+10) Output
 
-Section: Typography (fontHead, fontBody using existing font selector if any)
+Produce:
 
-Section: Logo (image upload)
+audit-results.json with sections for brochure feature
 
-SectionFooter: “Back” | “Next →”
+Tests, seeds, and migrations if missing
 
-Review tab (LeftPane)
+TOP_5_FIXES.brochure (short bullet list)
 
-Section: Render Actions
-
-Primary: “Render PDF”
-
-Secondary: “Download Latest” (enabled when download_url exists)
-
-Link: “Copy Share Link”
-
-Section: Status
-
-Show current status chip: Draft / Rendering… / Ready / Error (with message)
-
-RightPane (Live Preview Column)
-
-Div: PreviewHeader — “Live Preview”
-
-Div: PreviewCanvas — render the same layout component used for server render; scrollable; scales to fit width; light page shadows.
-
-Behavior: re-render on each edit (debounced 250–500ms)
-
-Autosave & Feedback:
-
-On any LeftPane change → local draft update → debounced PATCH to /brochures/:id (500–1000ms).
-
-When a PATCH completes → show subtle “Saved ✓” toast or inline status label.
-
-When clicking Render PDF:
-
-Set status to rendering, call /brochures/:id/render, show toast “Generating your PDF…”
-
-Poll (or refetch) the draft until status="ready" and download_url present → toast “PDF ready — Download”.
-
-2.4 Components & Files (search-first, reuse names)
-
-aura-client/src/features/brochure/api/brochure.ts
-
-createDraft, getDraft, updateDraft, renderDraft, getDownloadUrl
-
-aura-client/src/features/brochure/hooks/useBrochureDraft.ts
-
-Encapsulate loading by id, autosave (debounced), and status polling.
-
-aura-client/src/features/brochure/components/PreviewPane.tsx
-
-Accepts draft and renders the template layout.
-
-aura-client/src/features/brochure/templates/passo-building-v1/Layout.tsx
-
-Exactly mirrors final PDF pages (see mapping below).
-
-All typography/spacing via existing design tokens; no ad-hoc styles unless necessary.
-
-3) Template Layout — Explicit Page/Section Mapping
-
-Use one React layout component with clear page sections (divs). This same structure should be used both in the RightPane (live preview) and by the backend renderer (SSR/HTML export). The structure below matches the PDF.
-
-Layout.tsx structure:
-
-<div data-brochure="passo-v1">
-  {/* Page 1: Cover / Hero */}
-  <section data-page="1" data-role="hero">
-    <div className="hero-image" />  {/* uses draft.hero.image */}
-    <div className="hero-overlay">
-      <h1>{hero.title}</h1>
-      <p>{hero.subtitle}</p>
-      {/* brand logo if provided, aligned per design */}
-    </div>
-  </section>
-
-  {/* Page 2: About */}
-  <section data-page="2" data-role="about">
-    <header><h2>{about.heading}</h2></header>
-    <div className="about-body">
-      <p>{about.body}</p>
-      <div className="about-gallery">
-        {/* exactly two image slots; draw empty placeholders if absent */}
-      </div>
-    </div>
-  </section>
-
-  {/* Page 3: Why Invest */}
-  <section data-page="3" data-role="why-invest">
-    <aside className="side-quote">{whyInvest.sideQuote}</aside>
-    <ul className="bullet-list">{/* 3–5 bullets */}</ul>
-    <div className="interior-image" />
-  </section>
-
-  {/* Page 4: Payment Plan */}
-  <section data-page="4" data-role="payment-plan">
-    <header><h2>Payment Plan</h2></header>
-    <div className="plan-grid">{/* each item: percent big, label/date small */}</div>
-    <p className="plan-blurb">{paymentPlan.blurb}</p>
-  </section>
-
-  {/* Page 5: Amenities & Lifestyle */}
-  <section data-page="5" data-role="amenities">
-    <div className="amenities-bg" />
-    <div className="amenities-sections">{/* three text blocks */}</div>
-    <ul className="amenities-features">{/* feature chips/list */}</ul>
-  </section>
-
-  {/* Pages 6–7: Collections */}
-  <section data-page="6" data-role="collections-1">
-    {/* Wellness, Residences, Elite */}
-  </section>
-  <section data-page="7" data-role="collections-2">
-    {/* Penthouses, Beach Mansions */}
-  </section>
-
-  {/* Page 8: Agent */}
-  <section data-page="8" data-role="agent">
-    <div className="agent-card">
-      <div className="agent-photo" />
-      <div className="agent-info">
-        <h3>{agent.name}</h3>
-        <p>{agent.about}</p>
-        <p>{agent.phone} • {agent.website}</p>
-        <p>{agent.company}</p>
-      </div>
-      <div className="brand-logo" />
-    </div>
-  </section>
-</div>
-
-
-Branding tokens: map branding.primary/secondary/fontHead/fontBody/logo to CSS variables at the root of this layout (--brand-primary, etc.) so both preview and server render look identical.
-
-4) Data Hydration From Property
-
-When a property is selected in the Property tab:
-
-Prefill:
-
-hero.title = property title
-
-hero.subtitle = location / short pitch
-
-about.heading = property or building name
-
-about.body = a few sentences from property description (truncate safely)
-
-about.gallery = 1–2 property photos
-
-If property has milestones/payment info, map to paymentPlan.items
-
-Show an inline note: “We’ve prefilled from your property — adjust anything you like.”
-
-5) UX Polish & States
-
-Autosave: debounce 500–1000ms, show subtle “Saved ✓” inline (top-right of LeftPane header) and/or toast on the first save.
-
-Loaders: Use existing Skeleton while fetching draft and property list.
-
-Toasts:
-
-Save success/fail
-
-Render start (“Generating your PDF…”)
-
-Render success (“PDF ready — Download now”)
-
-Render error (show message and “Try again”)
-
-Buttons enablement:
-
-“Next” disabled until current step is complete (e.g., property selected).
-
-“Render PDF” enabled only if required fields are present (About heading/body at minimum).
-
-Error handling: Guard every null path in preview; show tasteful placeholders rather than crashing.
-
-6) Tests / Acceptance
-
-Create a simple manual QA checklist (README section under client/features/brochure and backend/app/routers/brochures.md):
-
-Create draft → select template → choose property → edit content/branding → render → download.
-
-Refresh the page mid-edit; ensure autosaved content returns.
-
-Break network mid-render; see error toast and recover.
-
-Verify final PDF typography/spacing are consistent with template.
-
-No console errors, no unhandled promise rejections.
-
-7) Deliverables Summary (only if no existing equivalents)
-
-Backend
-
-models/brochure.py, schemas/brochure.py, routers/brochures.py, services/render_service.py, templates/passo-building-v1.html (or SSR equivalent). Wire to main.py.
-
-Frontend
-
-features/brochure/pages/BrochureTemplates.tsx
-
-features/brochure/pages/BrochureEditor.tsx
-
-features/brochure/components/PreviewPane.tsx
-
-features/brochure/templates/passo-building-v1/Layout.tsx
-
-features/brochure/api/brochure.ts
-
-features/brochure/hooks/useBrochureDraft.ts
-
-Note: If similar files already exist, extend them instead of creating duplicates and keep imports/paths consistent with the rest of the application.
-
+0 failing tests on local run with SQLite

@@ -10,6 +10,14 @@ from .env_loader import load_env
 # Load environment variables from centralized loader
 load_env()
 
+
+def _get_bool(name: str, default: bool = False) -> bool:
+    """Parse boolean env vars (1/0/true/false)."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 # Base directory
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -22,9 +30,39 @@ DATABASE_URL = os.getenv(
     else "postgresql://admin:password123@localhost:5432/real_estate_db",
 )
 
+_object_store_path_raw = os.getenv("OBJECT_STORE_PATH")
+OBJECT_STORE_PATH = (
+    _object_store_path_raw.strip() if _object_store_path_raw else None
+)
+
 # ChromaDB Configuration
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8002"))
+
+# Optional Feature Flags
+ENABLE_PDF_WEASYPRINT = _get_bool("ENABLE_PDF_WEASYPRINT", False)
+ENABLE_VECTOR_CHROMA = _get_bool("ENABLE_VECTOR_CHROMA", False)
+
+# Optional Feature Flags
+ENABLE_PDF_WEASYPRINT = _get_bool("ENABLE_PDF_WEASYPRINT", False)
+ENABLE_VECTOR_CHROMA = _get_bool("ENABLE_VECTOR_CHROMA", False)
+
+# CORS defaults
+_default_cors_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS")
+if _cors_origins_env:
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = _default_cors_origins
+
+# Dev auth toggle (off by default)
+DEV_AUTH_ALLOW = _get_bool("DEV_AUTH_ALLOW", False)
 
 # Google AI Configuration
 # Support both GEMINI_API_KEY and GOOGLE_API_KEY for backward compatibility
@@ -147,6 +185,17 @@ class Settings:
         self.bcrypt_rounds = BCRYPT_ROUNDS
         self.rate_limit_requests_per_minute = RATE_LIMIT_REQUESTS_PER_MINUTE
         self.rate_limit_login_attempts = RATE_LIMIT_LOGIN_ATTEMPTS
+        # Optional features (expose both uppercase + snake_case for convenience)
+        self.ENABLE_PDF_WEASYPRINT = ENABLE_PDF_WEASYPRINT
+        self.ENABLE_VECTOR_CHROMA = ENABLE_VECTOR_CHROMA
+        self.enable_pdf_weasyprint = ENABLE_PDF_WEASYPRINT
+        self.enable_vector_chroma = ENABLE_VECTOR_CHROMA
+        self.object_store_path = OBJECT_STORE_PATH
+        self.OBJECT_STORE_PATH = OBJECT_STORE_PATH
+        self.cors_allowed_origins = CORS_ALLOWED_ORIGINS
+        self.CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS
+        self.dev_auth_allow = DEV_AUTH_ALLOW
+        self.DEV_AUTH_ALLOW = DEV_AUTH_ALLOW
 
 
 def get_settings() -> Settings:
@@ -178,6 +227,10 @@ __all__ = [
     "DATABASE_URL",
     "CHROMA_HOST",
     "CHROMA_PORT",
+    "ENABLE_PDF_WEASYPRINT",
+    "ENABLE_VECTOR_CHROMA",
+    "ENABLE_PDF_WEASYPRINT",
+    "ENABLE_VECTOR_CHROMA",
     "GOOGLE_API_KEY",
     "AI_MODEL",
     "HOST",
@@ -201,6 +254,11 @@ __all__ = [
     "BCRYPT_ROUNDS",
     "RATE_LIMIT_REQUESTS_PER_MINUTE",
     "RATE_LIMIT_LOGIN_ATTEMPTS",
+    "CORS_ALLOWED_ORIGINS",
+    "DEV_AUTH_ALLOW",
+    "OBJECT_STORE_PATH",
+    "ENABLE_PDF_WEASYPRINT",
+    "ENABLE_VECTOR_CHROMA",
     "validate_settings",
     "Settings",
     "get_settings",

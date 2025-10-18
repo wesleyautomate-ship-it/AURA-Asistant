@@ -5,7 +5,7 @@ import AIActionBar from '../../components/contacts/AIActionBar';
 import SmartInsightsPanel from '../../components/contacts/SmartInsightsPanel';
 import NotesEditor from '../../components/contacts/NotesEditor';
 import type { Contact, ContactDetail } from '../../types/contacts';
-import { getContactDetail, saveNotes } from '../../services/contactsApi';
+import { getContactDetail, getTimeline, saveNotes } from '../../services/contactsApi';
 import { generateFollowUp, summarizeNotes, recommendProperties, nextBestAction, type FollowUpTone, type FollowUpGoal } from '../../services/aiClient';
 import FollowUpModal from '../../components/contacts/FollowUpModal';
 import { listFollowUps, createFollowUp, type FollowUpItem } from '../../services/schedulesApi';
@@ -201,9 +201,24 @@ export default function ContactDetailPage() {
               <NotesEditor
                 initial={detail.notes}
                 onAutoSave={(value) => {
-                  setDetail(prev => (prev ? { ...prev, notes: value } : prev));
-                  const ac = new AbortController();
-                  saveNotes(contact.id, value, ac.signal).catch(() => {/* ignore stub errors */});
+                  const controller = new AbortController();
+                  saveNotes(contact.id, value, controller.signal)
+                    .then(async (res) => {
+                      setDetail(prev => (prev ? { ...prev, notes: res.notes } : prev));
+                      try {
+                        const timeline = await getTimeline(contact.id, controller.signal);
+                        setDetail(prev => (prev ? { ...prev, timeline } : prev));
+                      } catch (err: any) {
+                        if (err?.name !== 'AbortError') {
+                          console.warn('Failed to refresh timeline', err);
+                        }
+                      }
+                    })
+                    .catch((err: any) => {
+                      if (err?.name !== 'AbortError') {
+                        console.error('Failed to save notes', err);
+                      }
+                    });
                 }}
               />
               {/* Recommendations List */}
@@ -345,21 +360,21 @@ export default function ContactDetailPage() {
         onClose={() => setScheduleOpen(false)}
         onSave={async (data) => {
           const ac = new AbortController();
-          const created = await createFollowUp({ contactId: contact.id, ...data }, ac.signal);
+          await createFollowUp({ contactId: contact.id, ...data }, ac.signal);
           const items = await listFollowUps(contact.id);
           setFollowUps(items);
           const now = Date.now();
           const upcoming = items.filter(i => new Date(i.dueAt).getTime() >= now)
             .sort((a,b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0] || null;
           setNextFU(upcoming);
-          // Optimistic activity refresh
-          setDetail(prev => prev ? {
-            ...prev,
-            timeline: [
-              { id: created.id, ts: new Date().toISOString(), type: created.channel as any, text: `Scheduled ${created.channel} follow-up for ${new Date(created.dueAt).toLocaleString()}` },
-              ...prev.timeline,
-            ],
-          } : prev);
+          try {
+            const refreshedTimeline = await getTimeline(contact.id, ac.signal);
+            setDetail(prev => (prev ? { ...prev, timeline: refreshedTimeline } : prev));
+          } catch (err: any) {
+            if (err?.name !== 'AbortError') {
+              console.warn('Failed to refresh timeline after follow-up creation', err);
+            }
+          }
           setScheduleOpen(false);
         }}
       />

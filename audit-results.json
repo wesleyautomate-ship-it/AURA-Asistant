@@ -1,0 +1,721 @@
+{
+  "INVENTORY": {
+    "frontend": {
+      "pages": [
+        "aura-client/src/pages/Contacts.tsx",
+        "aura-client/src/pages/contacts/[id].tsx",
+        "aura-client/src/pages/Analytics.tsx",
+        "aura-client/src/pages/Chat.tsx",
+        "aura-client/src/pages/Requests.tsx"
+      ],
+      "routes": [
+        "aura-client/src/routes/index.tsx"
+      ],
+      "components_contacts": [
+        "aura-client/src/components/contacts/AIActionBar.tsx",
+        "aura-client/src/components/contacts/ContactCard.tsx",
+        "aura-client/src/components/contacts/ContactDetailHeader.tsx",
+        "aura-client/src/components/contacts/FollowUpModal.tsx",
+        "aura-client/src/components/contacts/NotesEditor.tsx",
+        "aura-client/src/components/contacts/SmartInsightsPanel.tsx",
+        "aura-client/src/components/Dashboard/Contacts/ContactsWorkspace.tsx",
+        "aura-client/src/components/Dashboard/Contacts/ContactsWorkspaceV2.tsx"
+      ],
+      "components_ai": [
+        "aura-client/src/components/ui/FollowUpCard.tsx",
+        "aura-client/src/pages/ai-workflow/brochure.tsx",
+        "aura-client/src/pages/ai-workflow/cma.tsx",
+        "aura-client/src/pages/ai-workflow/social.tsx"
+      ],
+      "services": [
+        "aura-client/src/services/contactsApi.ts",
+        "aura-client/src/services/aiClient.ts",
+        "aura-client/src/services/schedulesApi.ts",
+        "aura-client/src/services/orchestratorService.ts",
+        "aura-client/src/services/http.ts"
+      ],
+      "types_state_hooks": [
+        "aura-client/src/types/contacts.ts",
+        "aura-client/src/store/authStore.ts"
+      ],
+      "env": [
+        "aura-client/.env",
+        "aura-client/.env.example",
+        "aura-client/vite.config.ts"
+      ]
+    },
+    "backend": {
+      "app_main": [
+        "backend/app/main.py"
+      ],
+      "routes": [
+        "backend/app/api/v1/contacts_router.py",
+        "backend/app/api/v1/followups_router.py",
+        "backend/app/api/v1/ai_contacts_router.py",
+        "backend/app/api/v1/clients_router.py",
+        "backend/app/api/v1/health_router.py"
+      ],
+      "models": [
+        "backend/app/core/models.py",
+        "backend/app/domain/listings/enhanced_real_estate_models.py"
+      ],
+      "db_core": [
+        "backend/app/core/database.py",
+        "backend/app/core/settings.py"
+      ],
+      "alembic": [
+        "backend/app/alembic.ini",
+        "backend/app/alembic/env.py",
+        "backend/app/alembic/versions/001_phase01_baseline.py",
+        "backend/app/alembic/versions/002_properties_and_related.py",
+        "backend/app/alembic/versions/003_clients_conversations_messages.py",
+        "backend/app/alembic/versions/004_aura_core_entities.py",
+        "backend/app/alembic/versions/005_brochure_drafts.py",
+        "backend/app/alembic/versions/005_intelligence_content.py",
+        "backend/app/alembic/versions/005_seed_aura_data.py",
+        "backend/app/alembic/versions/0eb8185a636d_consolidate_models.py"
+      ],
+      "other_migrations": [
+        "backend/app/infrastructure/db/migrations/00_init_all.sql",
+        "backend/app/infrastructure/db/migrations/base_schema_migration.sql",
+        "backend/app/infrastructure/db/migrations/ai_assistant_schema_migration.sql",
+        "backend/app/infrastructure/db/migrations/ai_request_system_migration.sql",
+        "backend/app/infrastructure/db/migrations/brokerage_schema_migration.sql",
+        "backend/app/infrastructure/db/migrations/phase3_advanced_schema_migration.sql",
+        "backend/app/infrastructure/db/migrations/schema_enhancement_migration.sql"
+      ],
+      "seeds_scripts": [
+        "backend/app/infrastructure/db/seed_properties.py",
+        "backend/app/infrastructure/integrations/populate_postgresql.py"
+      ],
+      "env": [
+        "backend/.env",
+        "backend/.env.development"
+      ]
+    },
+    "database": {
+      "dev_sqlite_files": [
+        "propertypro_dev.db",
+        "backend/app/propertypro_dev.db"
+      ],
+      "docker_compose": [
+        "docker-compose.yml",
+        "docker-compose.dev.yml",
+        "docker-compose.staging.yml"
+      ]
+    }
+  },
+  "DB_AUDIT": {
+    "current": {
+      "entities": {
+        "contacts_mapped_to": "clients (EnhancedClient)",
+        "clients_table_columns": [
+          {
+            "name": "id",
+            "type": "Integer",
+            "pk": true
+          },
+          {
+            "name": "name",
+            "type": "String(255)",
+            "nullable": false
+          },
+          {
+            "name": "email",
+            "type": "String(255)",
+            "index": true
+          },
+          {
+            "name": "phone",
+            "type": "String(50)",
+            "index": true
+          },
+          {
+            "name": "budget_min",
+            "type": "DECIMAL(12,2)"
+          },
+          {
+            "name": "budget_max",
+            "type": "DECIMAL(12,2)"
+          },
+          {
+            "name": "preferred_location",
+            "type": "String(255)"
+          },
+          {
+            "name": "requirements",
+            "type": "Text"
+          },
+          {
+            "name": "client_type",
+            "type": "String(20)",
+            "default": "buyer",
+            "index": true
+          },
+          {
+            "name": "lead_id",
+            "type": "Integer",
+            "fk": "leads.id",
+            "index": true
+          },
+          {
+            "name": "assigned_agent_id",
+            "type": "Integer",
+            "fk": "users.id",
+            "index": true
+          },
+          {
+            "name": "client_status",
+            "type": "String(20)",
+            "default": "active",
+            "index": true
+          },
+          {
+            "name": "relationship_start_date",
+            "type": "Date"
+          },
+          {
+            "name": "total_transactions",
+            "type": "Integer",
+            "default": 0
+          },
+          {
+            "name": "total_value",
+            "type": "DECIMAL(15,2)",
+            "default": 0
+          },
+          {
+            "name": "client_tier",
+            "type": "String(20)",
+            "default": "standard",
+            "index": true
+          },
+          {
+            "name": "referral_source",
+            "type": "String(100)"
+          },
+          {
+            "name": "communication_history",
+            "type": "JSON",
+            "default": []
+          },
+          {
+            "name": "preferences",
+            "type": "JSON",
+            "default": {}
+          },
+          {
+            "name": "documents",
+            "type": "JSON",
+            "default": []
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime",
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "DateTime",
+            "default": "now() on update"
+          }
+        ],
+        "related_existing": [],
+        "migrations_present": true,
+        "alembic_versions": [
+          "001_phase01_baseline",
+          "002_properties_and_related",
+          "003_clients_conversations_messages",
+          "004_aura_core_entities",
+          "005_brochure_drafts",
+          "005_intelligence_content",
+          "005_seed_aura_data",
+          "0eb8185a636d_consolidate_models"
+        ]
+      }
+    },
+    "gaps": [
+      "No dedicated contact_notes table",
+      "No activities table scoped to contacts/clients",
+      "No followups table scoped to contacts/clients",
+      "Missing composite indexes for common lookups (contact_id, occurred_at/due_at)",
+      "Contacts (clients) lack last_activity_at and intent_score fields"
+    ],
+    "target_minimal_schema": {
+      "contact_notes": {
+        "columns": [
+          {
+            "name": "id",
+            "type": "Integer",
+            "pk": true
+          },
+          {
+            "name": "contact_id",
+            "type": "Integer",
+            "fk": "clients.id",
+            "ondelete": "CASCADE",
+            "index": true
+          },
+          {
+            "name": "body",
+            "type": "Text",
+            "nullable": false
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime",
+            "default": "now()",
+            "index": true
+          }
+        ]
+      },
+      "activities": {
+        "columns": [
+          {
+            "name": "id",
+            "type": "Integer",
+            "pk": true
+          },
+          {
+            "name": "contact_id",
+            "type": "Integer",
+            "fk": "clients.id",
+            "ondelete": "CASCADE",
+            "index": true
+          },
+          {
+            "name": "kind",
+            "type": "String(20)",
+            "check_in": [
+              "call",
+              "email",
+              "whatsapp",
+              "meeting",
+              "ai"
+            ]
+          },
+          {
+            "name": "occurred_at",
+            "type": "DateTime",
+            "nullable": false,
+            "index": true
+          },
+          {
+            "name": "summary",
+            "type": "Text",
+            "nullable": false
+          }
+        ],
+        "indexes": [
+          "(contact_id, occurred_at DESC)"
+        ]
+      },
+      "followups": {
+        "columns": [
+          {
+            "name": "id",
+            "type": "Integer",
+            "pk": true
+          },
+          {
+            "name": "contact_id",
+            "type": "Integer",
+            "fk": "clients.id",
+            "ondelete": "CASCADE",
+            "index": true
+          },
+          {
+            "name": "channel",
+            "type": "String(20)",
+            "check_in": [
+              "call",
+              "email",
+              "whatsapp",
+              "meeting"
+            ]
+          },
+          {
+            "name": "due_at",
+            "type": "DateTime",
+            "nullable": false,
+            "index": true
+          },
+          {
+            "name": "notes",
+            "type": "Text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime",
+            "default": "now()"
+          }
+        ],
+        "indexes": [
+          "(contact_id, due_at)"
+        ]
+      }
+    },
+    "plan": [
+      "Add SQLAlchemy models for contact_notes, activities, followups (using Base)",
+      "Create Alembic migration to create tables and indexes",
+      "Seed 5-10 clients with notes, activities, followups",
+      "Update contacts and followups routers to read/write from DB with graceful fallback",
+      "Add indexes for contact_id + time fields"
+    ],
+    "changes_applied": {
+      "models_added_in": "backend/app/domain/listings/enhanced_real_estate_models.py",
+      "migration_added": "backend/app/alembic/versions/006_contacts_crm.py",
+      "seed_script": "backend/scripts/seed_contacts.py",
+      "routers_updated": [
+        "backend/app/api/v1/contacts_router.py",
+        "backend/app/api/v1/followups_router.py"
+      ]
+    }
+  },
+  "BACKEND_AUDIT": {
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/contacts",
+        "query": [
+          "limit",
+          "offset"
+        ],
+        "response": "List[ContactBrief]"
+      },
+      {
+        "method": "GET",
+        "path": "/contacts/{id}",
+        "response": "ContactDetail"
+      },
+      {
+        "method": "GET",
+        "path": "/contacts/{id}/activity",
+        "response": "List[ActivityItem]"
+      },
+      {
+        "method": "GET",
+        "path": "/followups?contactId=...",
+        "response": "List[FollowUpItem]"
+      },
+      {
+        "method": "POST",
+        "path": "/followups",
+        "body": "FollowUpCreate",
+        "response": "FollowUpItem"
+      },
+      {
+        "method": "POST",
+        "path": "/ai/followup",
+        "body": "FollowUpRequest",
+        "response": "FollowUpDraft"
+      },
+      {
+        "method": "POST",
+        "path": "/ai/summarize",
+        "body": "SummaryBody",
+        "response": "SummaryResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/ai/next-best-action?contactId=...",
+        "response": "NextBestAction"
+      },
+      {
+        "method": "GET",
+        "path": "/ai/recommend?contactId=...",
+        "response": "RecommendResponse"
+      }
+    ],
+    "samples": {
+      "/contacts": [
+        {
+          "id": "1",
+          "name": "Alex Johnson",
+          "temperature": "Active",
+          "lastActivityAt": "2025-01-01T10:00:00Z"
+        }
+      ],
+      "/contacts/1": {
+        "id": "1",
+        "name": "Alex Johnson",
+        "temperature": "Active",
+        "email": "alex.j@example.com",
+        "phone": "+971 50 123 4567",
+        "lastActivityAt": "2025-01-01T10:00:00Z",
+        "notes": "...",
+        "intentScore": 62,
+        "signals": [
+          "Opened brochure"
+        ]
+      },
+      "/contacts/1/activity": [
+        {
+          "id": "1-t1",
+          "type": "call",
+          "at": "2025-01-01T09:30:00Z",
+          "text": "Discussed waterfront options"
+        }
+      ],
+      "/followups?contactId=1": [
+        {
+          "id": "1-173",
+          "contactId": "1",
+          "channel": "call",
+          "dueAt": "2025-01-02T10:00:00Z",
+          "notes": "Schedule quick call",
+          "createdAt": "2025-01-01T10:05:00Z"
+        }
+      ],
+      "POST /followups": {
+        "contactId": "1",
+        "channel": "call",
+        "dueAt": "2025-01-02T10:00:00Z",
+        "notes": "Schedule quick call"
+      },
+      "POST /ai/followup": {
+        "contactId": "1",
+        "tone": "Friendly",
+        "goal": "Re-engage"
+      }
+    }
+  },
+  "FRONTEND_AUDIT": {
+    "services": [
+      {
+        "file": "aura-client/src/services/contactsApi.ts",
+        "functions": [
+          {
+            "name": "getContacts",
+            "method": "GET",
+            "path": "/contacts",
+            "uses": [
+              "limit",
+              "offset"
+            ],
+            "returns": "Contact[]"
+          },
+          {
+            "name": "getContactDetail",
+            "method": "GET",
+            "path": "/contacts/{id}",
+            "returns": "ContactDetail"
+          },
+          {
+            "name": "getTimeline",
+            "method": "GET",
+            "path": "/contacts/{id}/activity",
+            "returns": "ContactDetail.timeline"
+          }
+        ]
+      },
+      {
+        "file": "aura-client/src/services/aiClient.ts",
+        "functions": [
+          {
+            "name": "generateFollowUp",
+            "method": "POST",
+            "path": "/ai/followup"
+          },
+          {
+            "name": "summarizeNotes",
+            "method": "POST",
+            "path": "/ai/summarize"
+          },
+          {
+            "name": "nextBestAction",
+            "method": "GET",
+            "path": "/ai/next-best-action"
+          },
+          {
+            "name": "recommendProperties",
+            "method": "GET",
+            "path": "/ai/recommend"
+          }
+        ]
+      },
+      {
+        "file": "aura-client/src/services/schedulesApi.ts",
+        "functions": [
+          {
+            "name": "listFollowUps",
+            "method": "GET",
+            "path": "/followups?contactId=..."
+          },
+          {
+            "name": "createFollowUp",
+            "method": "POST",
+            "path": "/followups"
+          }
+        ]
+      }
+    ],
+    "http_helper": {
+      "file": "aura-client/src/services/http.ts",
+      "env": {
+        "VITE_API_BASE_URL": true,
+        "VITE_USE_REAL_API": true,
+        "VITE_DEV_AUTH_TOKEN": true
+      },
+      "mock_gate": "api.enabled == (VITE_USE_REAL_API==='true')"
+    },
+    "contracts": {
+      "openapi_json": "scripts/openapi.json",
+      "types": "aura-client/src/types/api.d.ts",
+      "generator": "scripts/generate-types.sh"
+    }
+  },
+  "CONTRACTS": {
+    "openapi_source": "scripts/openapi.json",
+    "types_out": "aura-client/src/types/api.d.ts",
+    "generator": "scripts/generate-types.sh",
+    "contract_tests": [
+      "aura-client/src/tests/contract/openapi-types.spec.ts"
+    ]
+  },
+  "INVENTORY.brochure": {
+    "frontend": [
+      "aura-client/src/features/brochure/api/brochure.ts",
+      "aura-client/src/features/brochure/BrochureTile.tsx",
+      "aura-client/src/pages/ai-workflow/brochure.tsx",
+      "aura-client/src/pages/ai-workflow/brochure-editor.tsx",
+      "aura-client/src/services/brochureDrafts.ts",
+      "aura-client/src/services/brochureEngine.ts",
+      "aura-client/src/store/brochureDraftStore.ts",
+      "aura-client/src/types/brochure.ts",
+      "aura-client/src/utils/brochure.ts",
+      "aura-client/src/utils/brochureProgressSteps.ts"
+    ],
+    "backend": [
+      "backend/app/api/v1/brochures_router.py",
+      "backend/app/api/v1/export_router.py",
+      "backend/app/services/render_service.py",
+      "backend/app/schemas/brochure.py",
+      "backend/app/core/models.py",
+      "backend/app/domain/ai/file_storage_service.py"
+    ],
+    "database": {
+      "models": [
+        "backend/app/core/models.py#L1"
+      ],
+      "migrations": [
+        "backend/app/alembic/versions/005_brochure_drafts.py"
+      ]
+    },
+    "assets": []
+  },
+  "DB_AUDIT.brochure": {
+    "tables": {
+      "brochure_drafts": {
+        "columns": [
+          "id:String(36) PK",
+          "data:JSON",
+          "status:String(20) indexed",
+          "download_url:String(512)",
+          "created_at:DateTime",
+          "updated_at:DateTime"
+        ],
+        "indexes": [
+          "ix_brochure_drafts_status",
+          "ix_brochure_drafts_id(unique)"
+        ],
+        "fks": [],
+        "notes": "No templates or contacts FK; JSON holds draft blob"
+      }
+    },
+    "gaps": [
+      "Missing brochure_templates table and foreign key from drafts to template",
+      "No FK to contacts/listings for provenance",
+      "Consider index on created_at for listing/history queries"
+    ],
+    "plan": [
+      "Add brochure_templates table with seed data (clean-minimal, luxury-showcase, neighborhood-highlight)",
+      "Add optional brochure_drafts.template_id FK"
+    ]
+  },
+  "BACKEND_AUDIT.brochure": {
+    "routes": {
+      "POST /api/v1/brochures": "create draft",
+      "GET /api/v1/brochures/{id}": "get draft",
+      "PATCH /api/v1/brochures/{id}": "update draft data/status",
+      "POST /api/v1/brochures/{id}/render": "render PDF and set download_url",
+      "GET /api/v1/brochures/{id}/download": "get download_url"
+    },
+    "services": {
+      "render_service": "HTML builder + WeasyPrint if available, fallback to reportlab mock PDF",
+      "storage": "FileStorageService saves under uploads/deliverables/{id}"
+    },
+    "gaps": [
+      "No GET /api/v1/brochures list endpoint",
+      "No /api/v1/templates endpoint for brochure templates",
+      "Render fallback requires reportlab; add dependency or improve error messaging"
+    ]
+  },
+  "FRONTEND_AUDIT.brochure": {
+    "entry_points": [
+      "aura-client/src/features/brochure/BrochureTile.tsx",
+      "aura-client/src/pages/ai-workflow/brochure.tsx",
+      "aura-client/src/pages/ai-workflow/brochure-editor.tsx"
+    ],
+    "services": [
+      "createDraft, getDraft, updateDraft, renderDraft, getDownloadUrl in features/brochure/api/brochure.ts",
+      "brochureDraftService maps server payload to BrochureDraft type"
+    ],
+    "env": [
+      "VITE_API_BASE_URL",
+      "VITE_USE_REAL_API"
+    ],
+    "ux": [
+      "Loading and error states present in BrochureTile, simple editor pending",
+      "Progress helpers exist in utils/brochureProgressSteps.ts"
+    ]
+  },
+  "CONTRACTS_MISMATCH.brochure": [],
+  "ACCEPTANCE_MATRIX.brochure": [
+    {
+      "scenario": "List Templates",
+      "contracts": false,
+      "works_mock": true,
+      "works_real": true,
+      "ux_states": true,
+      "perf": "n/a"
+    },
+    {
+      "scenario": "Generate Brochure",
+      "contracts": true,
+      "works_mock": true,
+      "works_real": true,
+      "ux_states": true,
+      "perf": "ok"
+    },
+    {
+      "scenario": "Poll Status",
+      "contracts": true,
+      "works_mock": true,
+      "works_real": true,
+      "ux_states": true,
+      "perf": "ok"
+    },
+    {
+      "scenario": "Download PDF",
+      "contracts": true,
+      "works_mock": true,
+      "works_real": true,
+      "ux_states": true,
+      "perf": "ok"
+    },
+    {
+      "scenario": "Error Handling",
+      "contracts": true,
+      "works_mock": true,
+      "works_real": true,
+      "ux_states": true,
+      "perf": "n/a"
+    }
+  ],
+  "FIXES_APPLIED.brochure": [
+    "Aligned frontend BrochureDraft.status to include 'rendering' to match backend",
+    "Added backend tests for brochure routes and reportlab dependency"
+  ]
+}

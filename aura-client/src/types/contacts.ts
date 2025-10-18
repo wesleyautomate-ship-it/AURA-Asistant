@@ -20,9 +20,18 @@ export interface ContactDetail extends Contact {
   timeline: Array<{
     id: string;
     ts: string; // ISO
-    type: 'call' | 'email' | 'whatsapp' | 'meeting' | 'site-visit' | 'doc' | 'ai';
+    type:
+      | 'call'
+      | 'email'
+      | 'whatsapp'
+      | 'meeting'
+      | 'site-visit'
+      | 'doc'
+      | 'ai'
+      | 'note'
+      | 'followup'
+      | 'audit';
     text: string;
     meta?: Record<string, any>;
   }>;
 }
-

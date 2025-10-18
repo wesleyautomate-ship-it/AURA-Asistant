@@ -1,0 +1,5 @@
+- Align status naming between frontend and backend: use `rendering` consistently (update `aura-client/src/types/brochure.ts` to include `rendering` or map in `brochureDraftService`).
+- Add `GET /api/v1/brochures` list endpoint and wire `brochureDraftService.listDrafts()` to show history in UI.
+- Add `/api/v1/templates` endpoint and simple model/seed for brochure templates (clean-minimal, luxury-showcase, neighborhood-highlight); replace hardcoded list in UI.
+- Add backend tests for brochures flow (create → get → render → download) and ensure `reportlab` is in `requirements.txt` for PDF fallback.
+- Document runbook steps in `RUN.md` for brochure feature: start backend, run Alembic, seed templates, and run tests (pytest + frontend unit tests when added).

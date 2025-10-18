@@ -1,0 +1,347 @@
+﻿Root: AURA-Asistant
+
+Frontend: aura-client (Vite/React/TS)
+
+Backend: backend (FastAPI, Python)
+
+Database: use whatever exists; if nothing is wired, default to SQLAlchemy + Alembic; dev DB can be SQLite; allow Postgres via env.
+
+Feature under test
+Contacts: list â†’ detail â†’ AI actions (compose follow-up, summarize notes, recommend properties, next best action) â†’ schedule follow-up â†’ activity timeline â†’ persistence.
+
+0) Rules (must follow)
+
+Audit first. Only add code where missing. If similar code exists, modify itâ€”no duplicates.
+
+Keep mock mode. Real API is gated by VITE_USE_REAL_API=true; mocks remain when false.
+
+Database first-class. If models/migrations exist, reuse; otherwise scaffold minimal schema + migrations.
+
+Deterministic tests. All tests must run green locally and in CI with an ephemeral DB (SQLite or Postgres in Docker).
+
+Clear outputs. Produce a single audit-results.json plus runnable tests and a short RUN.md.
+
+1) Repository Inventory (read-only)
+
+Scan and list all files related to Contacts/AI/DB:
+
+Frontend:
+
+src/pages/**, src/routes/**
+
+src/components/contacts/**, src/components/ai/**
+
+src/services/** (contactsApi.ts, aiClient.ts, schedulesApi.ts, orchestratorService.ts)
+
+src/types/**, src/state/**, src/hooks/**
+
+Backend:
+
+app/main.py, app/api/**, app/routes/**, app/models/**, app/db/**, app/schemas/**, app/services/**
+
+Alembic config & migrations (if present)
+
+Database:
+
+ORM models, migrations, seed scripts, .env*, docker-compose*
+
+Deliverable: Put a structured list in audit-results.json.INVENTORY.
+
+2) Database Audit & Plan
+
+If DB already exists:
+
+Enumerate tables, columns, types, constraints, FKs, indexes.
+
+Map to domain entities: contacts, contact_notes, activities, followups, optional properties.
+
+Verify migrations are present and reversible.
+
+Identify gaps: missing indexes on lookups (contact_id, created_at), missing FKs, nullable fields that shouldnâ€™t be, lack of soft-delete/versioning, etc.
+
+If DB not present or incomplete:
+
+Scaffold SQLAlchemy models and Alembic migrations implementing the minimal schema below.
+
+Add seed script with small realistic dataset.
+
+Minimal schema (adapt names to match repo conventions if different):
+
+contacts (
+  id UUID/PK,
+  full_name TEXT NOT NULL,
+  email TEXT NULL UNIQUE,
+  phone TEXT NULL,
+  status TEXT NOT NULL CHECK(status IN ('New','Active','Warm','Cold')),
+  intent_score INTEGER NOT NULL DEFAULT 50,
+  last_activity_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+contact_notes (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+activities (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN ('call','email','whatsapp','meeting','ai')),
+  occurred_at TIMESTAMPTZ NOT NULL,
+  summary TEXT NOT NULL
+);
+CREATE INDEX idx_activities_contact_time ON activities(contact_id, occurred_at DESC);
+
+followups (
+  id UUID/PK,
+  contact_id FK -> contacts.id ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK(channel IN ('call','email','whatsapp','meeting')),
+  due_at TIMESTAMPTZ NOT NULL,
+  notes TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_followups_contact_due ON followups(contact_id, due_at);
+
+
+Deliverables:
+
+backend/app/models/*.py (or update existing)
+
+Alembic migration(s) creating the tables & indexes
+
+backend/scripts/seed_contacts.py to insert 5â€“10 contacts + related rows
+
+Section in audit-results.json.DB_AUDIT describing current vs target
+
+3) Backend Routes & Contracts
+
+Discover and document all relevant endpoints:
+
+/contacts (GET list)
+
+/contacts/{id} (GET detail)
+
+/contacts/{id}/activity (GET)
+
+/followups?contactId=... (GET), /followups (POST)
+
+/ai/followup (POST), /ai/summarize (POST), /ai/next-best-action (GET), /ai/recommend (GET)
+
+If missing, add minimal FastAPI routers under backend/app/routes/ with pydantic schemas, backed by DB queries:
+
+List endpoints must support pagination: ?limit&offset (defaults 20/0).
+
+Ensure CORS allows the dev frontend origin.
+
+Keep existing health/version endpoints untouched.
+
+Deliverables:
+
+Updated/created routers
+
+Pydantic request/response models
+
+Added app.include_router(...) in main.py
+
+Section audit-results.json.BACKEND_AUDIT with route table and sample payloads
+
+4) Frontend Service Contracts
+
+Audit and document each service function (method, URL, request, response). Ensure a single HTTP helper (create one if missing) that respects:
+
+VITE_API_BASE_URL
+
+VITE_USE_REAL_API (gate)
+
+Auth header placeholder VITE_DEV_AUTH_TOKEN (optional)
+
+If the repo already has services, do not duplicate; adapt them to call the new backend when VITE_USE_REAL_API=true, otherwise keep mocks.
+
+Deliverables:
+
+Updated services in aura-client/src/services/*
+
+audit-results.json.FRONTEND_AUDIT with a contracts table
+
+5) Contract Tests (type-safe)
+
+Generate a contract layer that fails the build if backend responses drift:
+
+Export backend OpenAPI (/openapi.json from FastAPI).
+
+Generate TS types with openapi-typescript into aura-client/src/types/api.d.ts.
+
+Replace any hand-rolled response types with these.
+
+Add a contract test that imports a few representative response samples and asserts assignability (or use runtime zod parsing, if zod exists).
+
+Deliverables:
+
+scripts/generate-types.sh
+
+aura-client/src/types/api.d.ts (git-tracked)
+
+aura-client/src/tests/contract/openapi-types.spec.ts
+
+6) Automated Tests
+6a) Backend: pytest (unit + integration)
+
+Create/extend tests under backend/tests/ using pytest and httpx.AsyncClient against the real FastAPI app with a temp DB:
+
+DB fixtures: spin up SQLite in-memory or a temporary Postgres (if docker-compose exists); run Alembic migrations, seed minimal fixtures.
+
+Contacts
+
+GET /contacts returns list, sortable by last_activity_at, paginated.
+
+GET /contacts/{id} returns detail and notes snippet.
+
+GET /contacts/{id}/activity returns descending activities.
+
+Followups
+
+POST /followups creates, persists, and can be fetched via GET /followups?contactId=....
+
+Validation errors for past due_at.
+
+AI endpoints (can be stubbed): return deterministic content and 200.
+
+File examples to generate (adjust paths if repo differs):
+
+backend/tests/conftest.py
+backend/tests/test_contacts_routes.py
+backend/tests/test_followups_routes.py
+backend/tests/test_ai_contacts_routes.py
+
+6b) Frontend: unit/integration (Vitest)
+
+Create tests that mock network calls (MSW) when VITE_USE_REAL_API=false and hit the real backend when true (flag controlled in test env):
+
+Contact list renders rows, filters by chip, shows skeletons.
+
+Contact detail loads intent score, signals, notes textarea autosave (debounced).
+
+Follow-up flow: open composer â†’ generate draft (mocked) â†’ save â†’ scheduler modal appears â†’ create follow-up â†’ activity list updates (optimistic or refetch).
+
+Files:
+
+aura-client/src/__tests__/ContactsList.spec.tsx
+aura-client/src/__tests__/ContactDetail.spec.tsx
+aura-client/src/__tests__/FollowUpFlow.spec.tsx
+
+6c) E2E: Playwright (recommended)
+
+Add Playwright tests to drive the whole app against the dev backend (SQLite):
+
+Scenarios:
+
+Happy path: load list â†’ open contact â†’ generate follow-up â†’ schedule for â€œCallâ€ tomorrow â†’ see item in â€œActivityâ€.
+
+AI summary: open summary â†’ loading shimmer appears â†’ summary text rendered.
+
+Recommendations: shows cards or empty state.
+
+Resilience: simulate 500 on AI endpoint and verify user sees inline error with retry.
+
+Files:
+
+aura-client/e2e/playwright.config.ts
+aura-client/e2e/contacts.e2e.spec.ts
+
+6d) Performance smoke: k6 (optional but add)
+
+Create a simple k6 script hitting /contacts and /contacts/{id} with 50 VUs for 30s and assert p95 < 300ms on dev machine.
+
+Files:
+
+perf/k6/contacts-smoke.js
+
+7) Seed & Runbook
+
+Add:
+
+backend/scripts/seed_contacts.py (idempotent)
+
+RUN.md at repo root with:
+
+Dev: start DB (if Postgres via docker-compose), run backend (uvicorn), run frontend (Vite), load .env examples
+
+Migrate: alembic upgrade head
+
+Seed: python backend/scripts/seed_contacts.py
+
+Tests: backend pytest -q, frontend pnpm test, e2e pnpm exec playwright test
+
+Contracts: ./scripts/generate-types.sh before frontend build
+
+Perf: k6 run perf/k6/contacts-smoke.js
+
+Add .env.example entries:
+
+# Frontend
+VITE_API_BASE_URL=http://localhost:8000
+VITE_USE_REAL_API=false
+VITE_DEV_AUTH_TOKEN=dev
+
+# Backend
+DATABASE_URL=sqlite:///./dev.db
+# or: postgresql+psycopg://postgres:postgres@localhost:5432/aura
+ALLOWED_ORIGINS=http://localhost:5173
+
+8) CI (GitHub Actions)
+
+If .github/workflows exists, extend; else create ci.yml:
+
+Checkout â†’ setup Python + Node
+
+Cache deps
+
+Spin Postgres service (if using Postgres) or use SQLite
+
+Run Alembic migrations
+
+Run backend tests
+
+Run contract type generation
+
+Run frontend unit tests
+
+(Optional) Run Playwright with headed=false
+
+9) Acceptance Matrix (auto-filled)
+
+Output a table like this in audit-results.json.ACCEPTANCE_MATRIX with âœ…/âš ï¸/âŒ and notes:
+
+Scenario	Contracts Match	Works Mock	Works Real DB	UX States Complete	Perf OK
+Load Contacts					
+Contact Detail					
+Generate Draft					
+Schedule Follow-Up					
+Activity Refresh					
+AI Summary					
+Recommendations					
+Next Best Action					
+10) Final Outputs to produce
+
+audit-results.json containing:
+
+INVENTORY, DB_AUDIT, BACKEND_AUDIT, FRONTEND_AUDIT,
+
+CONTRACTS (where the generated TS types live),
+
+TESTS_SUMMARY (counts of tests & pass/fail),
+
+ACCEPTANCE_MATRIX,
+
+GAPS (ordered list with fix suggestions),
+
+TOP_5_FIXES (short bullets).
+
+Files & folders added/updated as described above (tests, migrations, seeds, scripts, CI, docs).
+
+Zero test failures when running all suites locally with SQLite.
+
+Important: Do not break existing functionality. Prefer minimal, targeted changes. Where you add code, keep style consistent with the repo (naming, lint rules, UI spacing).

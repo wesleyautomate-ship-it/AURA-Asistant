@@ -12,7 +12,7 @@ def load_env():
     """Load environment variables from root .env file or use Docker environment"""
     # Check if we're running in Docker
     if os.getenv('ENVIRONMENT') == 'docker':
-        print("✅ Running in Docker environment - using environment variables")
+        print("[OK] Running in Docker environment - using environment variables")
         return
     
     # Get the project root directory (2 levels up from backend)
@@ -23,7 +23,7 @@ def load_env():
         load_dotenv(dotenv_path=env_file)
 
     else:
-        print(f"⚠️ .env file not found at: {env_file}")
+        print(f"[WARN] .env file not found at: {env_file}")
         # Fallback to current directory
         load_dotenv()
 

@@ -22,16 +22,24 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-# Import Brokerage model to resolve relationship
-try:
-    from app.domain.listings.brokerage_models import Brokerage  # noqa: F401
-except ImportError:
-    # If Brokerage model is not available, define a placeholder for type checking
+import os
+# Import Brokerage model to resolve relationship, but allow minimal test mode to avoid deep dependencies
+if os.getenv("AURA_TEST_MINIMAL_MODE") == "1":
     class Brokerage(Base):
         __tablename__ = "brokerages"
         id = Column(Integer, primary_key=True, index=True)
         name = Column(String(255), nullable=False, index=True)
         users = relationship("User", back_populates="brokerage")
+else:
+    try:
+        from app.domain.listings.brokerage_models import Brokerage  # noqa: F401
+    except ImportError:
+        # If Brokerage model is not available, define a placeholder for type checking
+        class Brokerage(Base):
+            __tablename__ = "brokerages"
+            id = Column(Integer, primary_key=True, index=True)
+            name = Column(String(255), nullable=False, index=True)
+            users = relationship("User", back_populates="brokerage")
 
 
 # Association tables for many-to-many relationships
@@ -232,6 +240,7 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    contact_id = Column(Integer, ForeignKey("clients.id"), nullable=True, index=True)
     event_type = Column(
         String(100), nullable=False
     )  # login, logout, password_change, etc.
@@ -240,6 +249,7 @@ class AuditLog(Base):
     user_agent = Column(Text, nullable=True)
     success = Column(Boolean, default=True)
     error_message = Column(Text, nullable=True)
+    occurred_at = Column(DateTime, default=func.now(), nullable=False, index=True)
     created_at = Column(DateTime, default=func.now())
 
     def __repr__(self):
@@ -291,8 +301,23 @@ class BrochureDraft(Base):
     data = Column(JSON, default=dict)  # entire draft blob
     status = Column(String(20), default="draft", index=True)
     download_url = Column(String(512), nullable=True)
+    template_id = Column(String(36), ForeignKey("brochure_templates.id"), nullable=True, index=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     def __repr__(self):
         return f"<BrochureDraft id={self.id} status={self.status}>"
+
+
+class BrochureTemplate(Base):
+    __tablename__ = "brochure_templates"
+
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    file_path = Column(String(512), nullable=False)
+    created_at = Column(DateTime, default=func.now())
+
+    def __repr__(self):
+        return f"<BrochureTemplate id={self.id} name={self.name}>"
