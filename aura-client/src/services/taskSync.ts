@@ -1,12 +1,13 @@
 import { useCommandStore } from '../store/commandStore';
 import { TASK_LIFECYCLE_CONFIG } from '../config/taskLifecycle';
+import api from './http';
+import type { AxiosError } from 'axios';
 
 let intervalId: number | null = null;
 let watchdogId: number | null = null;
 let retryCount = 0;
 const MAX_RETRIES = 3;
 const SYNC_INTERVAL = 10000; // 10 seconds
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const BACKEND_ENABLED = import.meta.env.VITE_BACKEND_ENABLED !== 'false'; // Disable with VITE_BACKEND_ENABLED=false
 
 export interface TaskSyncResponse {
@@ -49,21 +50,7 @@ export function startTaskSync(): void {
 
   const syncTasks = async () => {
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-      };
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/tasks/sync`, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tasks: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const { data } = await api.get<any>('/tasks/sync');
       
       // ✅ Guard against invalid or empty responses
       if (!data || typeof data !== 'object') {
@@ -85,21 +72,16 @@ export function startTaskSync(): void {
       
       // Auto-recovery: Check for incomplete mock/offline tasks
       performAutoRecovery(tasks);
-    } catch (err: any) {
-      console.warn('[TaskSync] Sync failed:', err.message || err);
+    } catch (error) {
+      const axiosError = error as AxiosError<any>;
+      console.warn('[TaskSync] Sync failed:', axiosError.message || axiosError);
       
-      // Log detailed error information for debugging
-      if (err.response) {
-        try {
-          const errorText = await err.response.text();
-          console.warn('[TaskSync] Server response:', {
-            status: err.response.status,
-            statusText: err.response.statusText,
-            body: errorText
-          });
-        } catch (textErr) {
-          console.warn('[TaskSync] Could not read error response body');
-        }
+      if (axiosError.response) {
+        console.warn('[TaskSync] Server response:', {
+          status: axiosError.response.status,
+          statusText: axiosError.response.statusText,
+          body: axiosError.response.data,
+        });
       }
       
       retryCount++;
@@ -160,21 +142,7 @@ export async function triggerTaskSync(): Promise<void> {
 
   try {
     console.log('[TaskSync] Manual sync triggered');
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/tasks/sync`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch tasks: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const { data } = await api.get<any>('/tasks/sync');
     
     // ✅ Guard against invalid or empty responses
     if (!data || typeof data !== 'object') {
@@ -192,9 +160,9 @@ export async function triggerTaskSync(): Promise<void> {
     
     store.syncTasks(tasks);
     console.log(`[TaskSync] Manual sync completed: ${tasks.length} tasks`);
-  } catch (err) {
-    console.error('[TaskSync] Manual sync failed:', err);
-    throw err;
+  } catch (error) {
+    console.error('[TaskSync] Manual sync failed:', (error as AxiosError<any>).message || error);
+    throw error;
   }
 }
 

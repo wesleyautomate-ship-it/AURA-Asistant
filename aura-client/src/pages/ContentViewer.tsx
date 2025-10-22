@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useCommandStore, IntelligenceContent } from '../store/commandStore';
+import api from '../services/http';
 import { 
   ArrowLeft,
   ChevronDown,
@@ -23,7 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BottomDock from '../components/ui/BottomDock';
 import RefineModal from '../components/RefineModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = (api.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
 interface ContentViewerParams {
   contentId: string;
@@ -51,7 +52,7 @@ export default function ContentViewer() {
   }, [isBrochure, content]);
 
   const brochurePdfUrl = isBrochure && content
-    ? `${API_BASE_URL}/api/v1/intelligence/content/${content.contentId}?format=pdf`
+    ? `${API_BASE_URL}/intelligence/content/${content.contentId}?format=pdf`
     : undefined;
 
   useEffect(() => {

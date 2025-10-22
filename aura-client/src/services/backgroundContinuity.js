@@ -19,6 +19,7 @@
  */
 
 import { useCommandStore } from '../store/commandStore';
+import api from './http';
 
 // Configuration for background services
 const BACKGROUND_CONFIG = {
@@ -447,23 +448,11 @@ class BackgroundContinuityService {
   async processTranscriptionTask(task) {
     const { audioId, audioData } = task.data;
     
-    const response = await fetch('/api/transcribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        audioId,
-        audioData,
-        sessionId: useCommandStore.getState().session.id
-      })
+    const { data: result } = await api.post('/transcribe', {
+      audioId,
+      audioData,
+      sessionId: useCommandStore.getState().session.id
     });
-
-    if (!response.ok) {
-      throw new Error(`Transcription API error: ${response.status}`);
-    }
-
-    const result = await response.json();
     
     // Update store with transcription result
     const store = useCommandStore.getState();

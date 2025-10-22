@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ContactsWorkspaceV2 from "../components/Dashboard/Contacts/ContactsWorkspaceV2";
 import type { Contact } from '../types/contacts';
 import { getContacts } from '../services/contactsApi';

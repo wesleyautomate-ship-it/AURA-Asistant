@@ -23,6 +23,7 @@ class BrochureResult(BaseModel):
 class BrochureDraftCreate(BaseModel):
     templateKey: str = Field("clean-minimal")
     data: Optional[Dict[str, Any]] = None
+    property_id: Optional[str] = None
 
 
 class BrochureDraftUpdate(BaseModel):

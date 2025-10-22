@@ -26,10 +26,11 @@ export async function listFollowUps(
   signal?: AbortSignal,
 ): Promise<FollowUpItem[]> {
   ensureRealApi();
-  return api.get<FollowUpItem[]>(
+  const { data } = await api.get<FollowUpItem[]>(
     `/followups?contactId=${encodeURIComponent(contactId)}`,
-    signal,
+    { signal },
   );
+  return data;
 }
 
 export async function createFollowUp(
@@ -37,7 +38,7 @@ export async function createFollowUp(
   signal?: AbortSignal,
 ): Promise<FollowUpItem> {
   ensureRealApi();
-  return api.post<FollowUpItem>(
+  const { data } = await api.post<FollowUpItem>(
     '/followups',
     {
       contactId: input.contactId,
@@ -45,8 +46,9 @@ export async function createFollowUp(
       dueAt: input.dueAt,
       notes: input.notes,
     },
-    signal,
+    { signal },
   );
+  return data;
 }
 
 export async function nextFollowUp(

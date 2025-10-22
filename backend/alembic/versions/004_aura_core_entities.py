@@ -1,7 +1,7 @@
 ﻿"""Add AURA core entities: Marketing, Analytics, Packages, Social Media, Transactions
 
-Revision ID: 004_aura_core_entities
-Revises: 003_clients_conversations_messages
+Revision ID: ae5d1c000004
+Revises: ae5d1c000003
 Create Date: 2025-09-24 13:30:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "004_aura_core_entities"
-down_revision: Union[str, None] = "003_clients_conversations_messages"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000004"
+down_revision = "ae5d1c000003"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

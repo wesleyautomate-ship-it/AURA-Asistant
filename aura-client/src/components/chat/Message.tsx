@@ -1,4 +1,3 @@
-import React from 'react';
 import type { ChatMessage } from '../../store/chatStore';
 
 export default function Message({ msg }: { msg: ChatMessage }) {

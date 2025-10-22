@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.models import BrochureDraft as BrochureDraftModel
+from app.core.models import BrochureDraft as BrochureDraftModel, Property, PropertyPhoto
 from app.schemas.brochure import (
     BrochureDraftCreate,
     BrochureDraftUpdate,
@@ -40,6 +40,50 @@ def _deep_merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _enrich_with_property_data(db: Session, property_id: str) -> Dict[str, Any] | None:
+    """
+    📋 [Brochure] Enrich brochure data with property information
+    
+    Fetches property data and converts to brochure listingData format.
+    This provides single source of truth from database.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Fetch property with photos
+        property_obj = db.query(Property).filter(Property.id == property_id).first()
+        if not property_obj:
+            logger.warning(f"📋 [Brochure] Property {property_id} not found for enrichment")
+            return None
+        
+        # Build listingData from property
+        listing_data = {
+            "title": property_obj.title,
+            "building": property_obj.building, 
+            "community": property_obj.community,
+            "beds": property_obj.beds,
+            "baths": property_obj.baths,
+            "area_sqft": property_obj.area_sqft,
+            "price_aed": property_obj.price_aed,
+            "description": property_obj.description,
+            "photos": [
+                {"url": photo.url, "sort": photo.sort_order} 
+                for photo in sorted(property_obj.photos, key=lambda p: p.sort_order)
+            ]
+        }
+        
+        # Remove None values
+        listing_data = {k: v for k, v in listing_data.items() if v is not None}
+        
+        logger.info(f"📋 [Brochure] Enriched brochure with property {property_id}: {listing_data.get('title')}")
+        return listing_data
+        
+    except Exception as e:
+        logger.error(f"📋 [Brochure] Failed to enrich with property {property_id}: {e}")
+        return None
+
+
 def _default_data(template_key: str) -> Dict[str, Any]:
     return {
         "templateKey": template_key,
@@ -60,7 +104,18 @@ def _default_data(template_key: str) -> Dict[str, Any]:
 def create_brochure(payload: BrochureDraftCreate, db: Session = Depends(get_db)) -> BrochureDraftOut:
     template_key = payload.templateKey or "clean-minimal"
     data = _deep_merge(_default_data(template_key), payload.data or {})
-    row = BrochureDraftModel(data=data, status="draft")
+    
+    # 📋 [Brochure] Property enrichment - inject property data if property_id provided
+    if payload.property_id:
+        property_data = _enrich_with_property_data(db, payload.property_id)
+        if property_data:
+            data = _deep_merge(data, {"listingData": property_data})
+    
+    row = BrochureDraftModel(
+        data=data, 
+        status="draft",
+        property_id=payload.property_id
+    )
     db.add(row)
     db.commit()
     db.refresh(row)

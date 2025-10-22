@@ -5,7 +5,6 @@
  * Displays structured content with consistent visual hierarchy and export options
  */
 
-import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   FileText, 

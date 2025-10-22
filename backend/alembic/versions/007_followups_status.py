@@ -1,7 +1,7 @@
 """Add status to followups
 
-Revision ID: 007_followups_status
-Revises: 006_contacts_crm
+Revision ID: ae5d1c000108
+Revises: ae5d1c000107
 Create Date: 2025-10-18 00:00:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "007_followups_status"
-down_revision: Union[str, None] = "006_contacts_crm"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000108"
+down_revision = "ae5d1c000107"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -35,4 +35,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("followups", "status")
-

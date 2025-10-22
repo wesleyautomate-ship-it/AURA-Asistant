@@ -1,110 +1,62 @@
-/**
- * Protected Route Component
- * =========================
- * 
- * A wrapper component that protects routes requiring authentication.
- * Works seamlessly with the development auth store for local testing.
- * 
- * Usage:
- * <ProtectedRoute>
- *   <YourProtectedComponent />
- * </ProtectedRoute>
- */
-
-import React from 'react'
+import type { ReactNode } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { useAuth } from '../../store/authStore'
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+  children: ReactNode
+  fallback?: ReactNode
   requireRole?: string
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  fallback,
-  requireRole 
-}) => {
+const ProtectedRoute = ({ children, fallback, requireRole }: ProtectedRouteProps) => {
   const { user, isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
 
-  // Show loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
-          <p className="text-gray-400">Authenticating...</p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center space-y-4 text-slate-200">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+          <p>Authenticating...</p>
         </div>
       </div>
     )
   }
 
-  // Not authenticated - show fallback or login prompt
   if (!isAuthenticated || !user) {
     if (fallback) {
       return <>{fallback}</>
     }
 
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="max-w-md w-full bg-gray-800 rounded-lg p-8 text-center">
-          <div className="mb-6">
-            <div className="mx-auto w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-4">
-              <span className="text-xl">🔒</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Authentication Required</h1>
-            <p className="text-gray-400">
-              Please log in to access this area.
-            </p>
-          </div>
-          
-          <div className="space-y-3">
-            <button 
-              onClick={() => window.location.href = '/login'}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              Go to Login
-            </button>
-            
-            <div className="text-sm text-gray-500">
-              Development Mode: Authentication is automatically handled
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
-  // Check role requirements
   if (requireRole && user.role !== requireRole) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <div className="max-w-md w-full bg-gray-800 rounded-lg p-8 text-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <div className="w-full max-w-md rounded-lg bg-slate-800 p-8 text-center shadow-lg">
           <div className="mb-6">
-            <div className="mx-auto w-12 h-12 bg-red-500 rounded-full flex items-center justify-center mb-4">
-              <span className="text-xl">⚠️</span>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white">
+              !
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-            <p className="text-gray-400">
-              Your role ({user.role}) doesn't have permission to access this area.
-            </p>
-            <p className="text-gray-500 text-sm mt-2">
-              Required role: {requireRole}
+            <h1 className="mb-2 text-2xl font-bold text-white">Access denied</h1>
+            <p className="text-sm text-slate-300">
+              Your role ({user.role}) does not have access to this area. Required role: {requireRole}
             </p>
           </div>
-          
-          <button 
+
+          <button
             onClick={() => window.history.back()}
-            className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-600"
           >
-            Go Back
+            Go back
           </button>
         </div>
       </div>
     )
   }
 
-  // User is authenticated and authorized - render protected content
   return <>{children}</>
 }
 

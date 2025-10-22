@@ -11,6 +11,7 @@
 
 import { useCommandStore } from '../store/commandStore';
 import type { QueuedOperation } from '../store/commandStore';
+import api from './http';
 
 interface OfflineAudioRecord {
   id: string;
@@ -180,14 +181,9 @@ class OfflineRecoveryService {
     
     try {
       // Test connection with a lightweight request
-      const response = await fetch('/health', { 
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000)
+      await api.head('/health', {
+        timeout: 5000,
       });
-      
-      if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`);
-      }
       
       // Connection is good
       if (!this.networkStatus.online) {

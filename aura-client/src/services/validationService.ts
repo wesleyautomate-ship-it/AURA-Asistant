@@ -12,8 +12,9 @@
 
 import { ContentType, ValidationResult } from '../types/contentSchemas';
 import { NormalizedIntent } from './intentNormalizer';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from './http';
+import templateOrchestrator from './templateOrchestrator';
+import type { AxiosError } from 'axios';
 
 export interface ValidationRequest {
   contentType: ContentType;
@@ -33,25 +34,9 @@ export const validatePayload = async (
   console.time('Validation');
 
   try {
-    const endpoint = `/api/v1/validate/${request.contentType.toLowerCase()}`;
-    
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth if available
-        ...(localStorage.getItem('authToken') && {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }),
-      },
-      body: JSON.stringify(request.payload),
-    });
+    const endpoint = `/validate/${request.contentType.toLowerCase()}`;
 
-    if (!response.ok) {
-      throw new Error(`Validation endpoint returned ${response.status}`);
-    }
-
-    const result: ValidationResult = await response.json();
+    const { data: result } = await api.post<ValidationResult>(endpoint, request.payload);
     
     console.log('✅ Validation Result:', {
       valid: result.valid,
@@ -273,48 +258,32 @@ export const validateAndGenerate = async (
   payload: Record<string, any>,
   requestId: string
 ): Promise<{ valid: boolean; data?: any; errors?: any[] }> => {
-  // Import WORKFLOW_MAP here to avoid circular dependency
-  const { WORKFLOW_MAP } = await import('./orchestratorService');
-  
-  const endpoint = WORKFLOW_MAP[contentType];
+  const templateConfig = templateOrchestrator.getTemplateConfig(contentType as any);
+  const endpoint = templateConfig.endpoint;
   console.log(`[Validation] Unified call to ${endpoint}`);
-  
+  const normalizedEndpoint = endpoint.startsWith('/api/v1') ? endpoint.replace('/api/v1', '') : endpoint;
+
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('authToken') && {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }),
-      },
-      body: JSON.stringify({
-        ...payload,
-        request_id: requestId,
-      }),
+    const { data } = await api.post(normalizedEndpoint, {
+      ...payload,
+      request_id: requestId,
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('[Validation] ✅ Success:', response.status);
-      return { valid: true, data };
-    }
-    
-    // Handle 422 validation errors
-    if (response.status === 422) {
-      const errorData = await response.json();
-      console.warn('[Validation] ⚠️ Schema validation failed (422):', errorData.detail);
-      return { 
-        valid: false, 
-        errors: Array.isArray(errorData.detail) ? errorData.detail : [errorData.detail]
+    console.log('[Validation] ✅ Success');
+    return { valid: true, data };
+  } catch (err) {
+    const error = err as AxiosError<any>;
+    if (error.response?.status === 422) {
+      const detail = error.response.data?.detail;
+      console.warn('[Validation] ⚠️ Schema validation failed (422):', detail);
+      return {
+        valid: false,
+        errors: Array.isArray(detail) ? detail : [detail],
       };
     }
-    
-    // Other errors
-    throw new Error(`API returned ${response.status}: ${response.statusText}`);
-    
-  } catch (err: any) {
-    console.error('[Validation] ❌ Error:', err.message);
-    throw err;
+
+    console.error('[Validation] ❌ Error:', error.message);
+    throw error;
   }
+
+
 };

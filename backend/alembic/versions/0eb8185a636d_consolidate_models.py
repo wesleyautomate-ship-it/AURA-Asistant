@@ -1,7 +1,7 @@
 """Consolidate models
 
-Revision ID: 0eb8185a636d
-Revises: 005_seed_aura_data
+Revision ID: ae5d1c000106
+Revises: ae5d1c000105
 Create Date: 2025-09-29 16:42:05.425450
 
 """
@@ -12,10 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '0eb8185a636d'
-down_revision: Union[str, Sequence[str], None] = '005_seed_aura_data'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000106"
+down_revision = "ae5d1c000105"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

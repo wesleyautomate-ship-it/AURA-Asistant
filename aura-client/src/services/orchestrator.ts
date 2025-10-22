@@ -165,6 +165,11 @@ export async function orchestrateCommand(
         workflowResponse = await createSocialPost(intent, recentTasks, contextHistory, prompt);
         break;
       
+      case 'BROCHURE':
+        console.log('[Orchestrator] Executing Brochure workflow');
+        workflowResponse = await executeBrochureWorkflow(prompt, intent);
+        break;
+      
       default:
         console.log('[Orchestrator] Unknown intent type, falling back to streaming');
         return {
@@ -270,6 +275,21 @@ export function generateMockWorkflowResponse(intent: Intent): WorkflowResponse {
         },
       };
     
+    case 'BROCHURE':
+      const building = intent.building || 'Unknown Building';
+      const beds = intent.beds ? `${intent.beds}BR ` : '';
+      return {
+        success: true,
+        task_id: taskId,
+        message: `Property brochure for ${beds}${building} is being generated.`,
+        data: {
+          building: intent.building,
+          beds: intent.beds,
+          unit: intent.unit,
+          estimated_completion: '2-3 minutes',
+        },
+      };
+    
     default:
       return {
         success: false,
@@ -329,6 +349,99 @@ async function executeCMAWorkflow(intent: any, recentTasks: any[], contextHistor
     console.error('CMA workflow execution failed:', error);
     console.groupEnd();
     throw error;
+  }
+}
+
+// Helper function for Brochure workflow execution
+async function executeBrochureWorkflow(prompt: string, intent: Intent): Promise<WorkflowResponse> {
+  console.group('[Orchestrator] 📋 Brochure Workflow Execution');
+  console.log('Intent:', intent);
+  console.log('Original prompt:', prompt);
+  
+  try {
+    // Import API clients dynamically to avoid circular dependencies
+    const { search: searchProperties, create: createProperty, buildMinimalProperty } = await import('../features/properties/api/properties');
+    const { createDraft, renderDraft } = await import('../features/brochure/api/brochure');
+    
+    console.log('📍 [Brochure] Step 1: Try to resolve existing property');
+    
+    let property = null;
+    
+    // Try to find existing property if we have building info
+    if (intent.building) {
+      const searchResults = await searchProperties({
+        q: prompt,
+        building: intent.building,
+        unit: intent.unit,
+        limit: 1
+      });
+      
+      if (searchResults.length > 0) {
+        property = searchResults[0];
+        console.log(`✅ [Brochure] Found existing property: ${property.title}`);
+      }
+    }
+    
+    // If no property found, create minimal property (idempotent)
+    if (!property) {
+      console.log('🏠 [Brochure] Step 2: Creating minimal property');
+      const propertyPayload = buildMinimalProperty(prompt, intent);
+      
+      try {
+        property = await createProperty(propertyPayload);
+        console.log(`✅ [Brochure] Created property: ${property.title}`);
+      } catch (error: any) {
+        console.error('❌ [Brochure] Property creation failed:', error);
+        // Continue without property_id - brochure can still be created
+      }
+    }
+    
+    console.log('📋 [Brochure] Step 3: Creating brochure draft');
+    
+    // Create brochure draft (with property enrichment if available)
+    const draftPayload = {
+      templateKey: 'clean-minimal',
+      property_id: property?.id,
+    };
+    
+    const draft = await createDraft(draftPayload);
+    console.log(`✅ [Brochure] Created draft: ${draft.id}`);
+    
+    console.log('🎨 [Brochure] Step 4: Rendering PDF');
+    
+    // Render the brochure to PDF
+    const renderResult = await renderDraft(draft.id);
+    console.log(`✅ [Brochure] PDF rendered: ${renderResult.download_url}`);
+    
+    console.groupEnd();
+    
+    // Return successful workflow response
+    return {
+      success: true,
+      task_id: `brochure_${draft.id}`,
+      message: `Brochure created successfully! ${property ? `Property: ${property.title}` : 'Ready for download.'}`,
+      data: {
+        brochureId: draft.id,
+        propertyId: property?.id,
+        propertyTitle: property?.title,
+        downloadUrl: renderResult.download_url,
+        building: intent.building,
+        beds: intent.beds,
+        unit: intent.unit,
+      },
+    };
+    
+  } catch (error: any) {
+    console.error('❌ [Brochure] Workflow execution failed:', error);
+    console.groupEnd();
+    
+    // Return graceful failure (orchestrator will handle fallback)
+    return {
+      success: false,
+      task_id: '',
+      message: 'Brochure creation failed',
+      error: error.message || 'Unknown error',
+    };
   }
 }
 

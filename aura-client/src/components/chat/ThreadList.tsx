@@ -1,8 +1,7 @@
-import React from 'react';
 import { useChatStore } from '../../store/chatStore';
 
 export default function ThreadList() {
-  const { threads, currentThreadId, setCurrentThread, createThread, renameThread } = useChatStore();
+  const { threads, currentThreadId, setCurrentThread, createThread } = useChatStore();
 
   return (
     <div className="h-full flex flex-col">

@@ -1,0 +1,22 @@
+{
+  "login_status": 200,
+  "login_body": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJzYXJhaC5qb2huc29uQHJlYWx0b3Jwcm8uYWUiLCJyb2xlIjoiYWdlbnQiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYxMTI3NDA4LCJpYXQiOjE3NjExMjM4MDh9.f2EYZnh71DlrL0mOQlFdKAGNcWih22_BTszKaq5H1Qk",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NjE3Mjg2MDgsImlhdCI6MTc2MTEyMzgwOH0.wOmdO-4o8mSb_rPwTh_nxWyG_7UQPpGwi9U_s62sB5M",
+    "token_type": "bearer",
+    "expires_in": 3600,
+    "user": {
+      "id": 1,
+      "email": "sarah.johnson@realtorpro.ae",
+      "first_name": "Sarah",
+      "last_name": "Johnson",
+      "role": "agent"
+    }
+  },
+  "refresh_status": 200,
+  "refresh_body": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJzYXJhaC5qb2huc29uQHJlYWx0b3Jwcm8uYWUiLCJyb2xlIjoiYWdlbnQiLCJ0eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYxMTI3NDA4LCJpYXQiOjE3NjExMjM4MDh9.f2EYZnh71DlrL0mOQlFdKAGNcWih22_BTszKaq5H1Qk",
+    "token_type": "bearer",
+    "expires_in": 3600
+  }
+}

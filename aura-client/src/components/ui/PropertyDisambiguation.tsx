@@ -6,7 +6,6 @@
  * during brochure generation
  */
 
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, MapPin, DollarSign, X } from 'lucide-react';
 import { PropertyMatch } from '../../utils/brochureProgressSteps';

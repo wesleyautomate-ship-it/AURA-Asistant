@@ -5,7 +5,6 @@
  * Supports consistent visual hierarchy and responsive design
  */
 
-import React from 'react';
 import { motion } from 'framer-motion';
 import { 
   ChevronLeft, 

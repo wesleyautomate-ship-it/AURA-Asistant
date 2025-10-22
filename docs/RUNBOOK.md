@@ -79,6 +79,17 @@ python scripts/seed_contacts.py
 
 ```powershell
 cd aura-client
+
+## Authentication Flow
+
+- Ensure the frontend `.env` has `VITE_USE_REAL_API=true` and `VITE_API_BASE=http://localhost:8000/api/v1`.
+- Access and refresh tokens persist in `localStorage` for development sessions.
+
+### Manual Verification
+1. Login through the UI and confirm both tokens appear in storage.
+2. Manually corrupt `localStorage.access_token`, trigger any protected request, and observe the automatic refresh + token update.
+3. Call the logout action and verify tokens are cleared and the app navigates to `/login`.
+
 npm install
 npm run dev -- --host
 ```
@@ -111,6 +122,7 @@ curl http://localhost:8000/health
 curl http://localhost:8000/healthz
 curl http://localhost:8000/readyz
 curl http://localhost:8000/version
+curl http://localhost:8000/api/v1/templates
 ```
 
 Note: `/readyz` can be used by your process manager/K8s readiness probes.

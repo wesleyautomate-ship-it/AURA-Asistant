@@ -41,6 +41,7 @@ class EnhancedProperty(Base):
     """Enhanced property model with comprehensive real estate data"""
 
     __tablename__ = "properties"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
@@ -86,18 +87,18 @@ class EnhancedProperty(Base):
         "User", foreign_keys=[agent_id], back_populates="managed_properties"
     )
     creator = relationship("User", foreign_keys=[created_by])
-    transactions = relationship("Transaction", back_populates="property")
-    viewings = relationship("PropertyViewing", back_populates="property")
-    compliance_records = relationship("RERACompliance", back_populates="property")
-    listing_history = relationship(
-        "ListingHistory", back_populates="property", cascade="all, delete-orphan"
-    )
-    confidential_details = relationship(
-        "PropertyConfidential",
-        back_populates="property",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
+    # transactions = relationship("Transaction", back_populates="property")
+    # viewings = relationship("PropertyViewing", back_populates="property")
+    # compliance_records = relationship("RERACompliance", back_populates="property")
+    # listing_history = relationship(
+    #     "ListingHistory", back_populates="property", cascade="all, delete-orphan"
+    # )
+    # confidential_details = relationship(
+    #     "PropertyConfidential",
+    #     back_populates="property",
+    #     uselist=False,
+    #     cascade="all, delete-orphan",
+    # )
 
     def __repr__(self):
         return f"<EnhancedProperty(id={self.id}, title='{self.title}', price_aed={self.price_aed})>"
@@ -143,6 +144,7 @@ class EnhancedLead(Base):
     """Enhanced lead model with nurturing and automation capabilities"""
 
     __tablename__ = "leads"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -186,12 +188,12 @@ class EnhancedLead(Base):
         "User", foreign_keys=[assigned_agent_id], back_populates="assigned_leads"
     )
     legacy_agent = relationship("User", foreign_keys=[agent_id])
-    lead_history = relationship(
-        "LeadHistory", back_populates="lead", cascade="all, delete-orphan"
-    )
-    viewings = relationship("PropertyViewing", back_populates="lead")
-    appointments = relationship("Appointment", back_populates="lead")
-    client = relationship("EnhancedClient", back_populates="lead", uselist=False)
+    # lead_history = relationship(
+    #     "LeadHistory", back_populates="lead", cascade="all, delete-orphan"
+    # )
+    # viewings = relationship("PropertyViewing", back_populates="lead")
+    # appointments = relationship("Appointment", back_populates="lead")
+    # client = relationship("EnhancedClient", back_populates="lead", uselist=False)
 
     def __repr__(self):
         return f"<EnhancedLead(id={self.id}, name='{self.name}', nurture_status='{self.nurture_status}')>"
@@ -225,6 +227,7 @@ class EnhancedClient(Base):
     """Enhanced client model with relationship management"""
 
     __tablename__ = "clients"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -254,12 +257,12 @@ class EnhancedClient(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    lead = relationship("EnhancedLead", back_populates="client")
+    # lead = relationship("EnhancedLead", back_populates="client")
     assigned_agent = relationship(
         "User", foreign_keys=[assigned_agent_id], back_populates="assigned_clients"
     )
-    transactions = relationship("Transaction", back_populates="buyer")
-    appointments = relationship("Appointment", back_populates="client")
+    # transactions = relationship("Transaction", back_populates="buyer")
+    # appointments = relationship("Appointment", back_populates="client")
 
     def __repr__(self):
         return f"<EnhancedClient(id={self.id}, name='{self.name}', client_type='{self.client_type}')>"

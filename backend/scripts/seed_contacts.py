@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.all_models import import_all_models
 from app.core.database import SessionLocal
+from app.core.models import Brokerage
 from app.domain.listings.enhanced_real_estate_models import (
     ContactActivity,
     ContactNote,
@@ -20,6 +21,23 @@ from app.domain.listings.enhanced_real_estate_models import (
 )
 
 import_all_models()
+
+DEFAULT_BROKERAGE_NAME = "Dubai Prime Realty"
+
+
+def _ensure_default_brokerage(db: Session) -> int:
+    """Fetch or create the default brokerage and return its ID."""
+    brokerage = (
+        db.query(Brokerage)
+        .filter(Brokerage.name == DEFAULT_BROKERAGE_NAME)
+        .first()
+    )
+    if brokerage is None:
+        brokerage = Brokerage(name=DEFAULT_BROKERAGE_NAME)
+        db.add(brokerage)
+        db.flush()
+    return brokerage.id
+
 
 CONTACT_DATA = [
     {
@@ -208,7 +226,9 @@ CONTACT_DATA = [
 ]
 
 
-def _ensure_client(db: Session, entry: dict, now: datetime) -> EnhancedClient:
+def _ensure_client(
+    db: Session, entry: dict, now: datetime, default_brokerage_id: int
+) -> EnhancedClient:
     contact = db.query(EnhancedClient).filter(EnhancedClient.email == entry["email"]).first()
     if not contact:
         contact = EnhancedClient(
@@ -217,6 +237,7 @@ def _ensure_client(db: Session, entry: dict, now: datetime) -> EnhancedClient:
             phone=entry["phone"],
             client_status=entry["status"],
             preferred_location=entry.get("preferred_location"),
+            brokerage_id=entry.get("brokerage_id") or default_brokerage_id,
         )
         db.add(contact)
         db.flush()
@@ -225,6 +246,10 @@ def _ensure_client(db: Session, entry: dict, now: datetime) -> EnhancedClient:
         contact.phone = entry["phone"]
         contact.client_status = entry["status"]
         contact.preferred_location = entry.get("preferred_location")
+        if entry.get("brokerage_id"):
+            contact.brokerage_id = entry["brokerage_id"]
+        elif not contact.brokerage_id:
+            contact.brokerage_id = default_brokerage_id
     return contact
 
 
@@ -311,8 +336,13 @@ def run(data: Iterable[dict] | None = None) -> None:
     now = datetime.utcnow()
     session = SessionLocal()
     try:
+        default_brokerage_id = _ensure_default_brokerage(session)
+
         for entry in dataset:
-            contact = _ensure_client(session, entry, now)
+            if entry.get("brokerage_id") is None:
+                entry["brokerage_id"] = default_brokerage_id
+
+            contact = _ensure_client(session, entry, now, default_brokerage_id)
             cid = contact.id
 
             for note in entry.get("notes", []):

@@ -8,8 +8,8 @@ export type FollowUpGoal = 'Re-engage' | 'Schedule Call' | 'Share Brochure' | 'N
 
 export async function generateFollowUp(contactId: string, opts?: { tone?: FollowUpTone; goal?: FollowUpGoal }) {
   if (api.enabled) {
-    const res = await api.post<{ draft: string }>(`/ai/followup`, { contactId, ...opts });
-    return res.draft;
+    const { data } = await api.post<{ draft: string }>(`/ai/followup`, { contactId, ...opts });
+    return data.draft;
   }
   await delay(350);
   const tone = opts?.tone || 'Friendly';
@@ -19,8 +19,8 @@ export async function generateFollowUp(contactId: string, opts?: { tone?: Follow
 
 export async function summarizeNotes(contactId: string) {
   if (api.enabled) {
-    const res = await api.post<{ summary: string }>(`/ai/summarize`, { contactId });
-    return res.summary;
+    const { data } = await api.post<{ summary: string }>(`/ai/summarize`, { contactId });
+    return data.summary;
   }
   await delay(280);
   return 'Summary: Interested in waterfront, 2–3BR around 6M AED; prefers Marina/Palm, responsive to brochures; follow up this week.';
@@ -36,8 +36,10 @@ export interface Recommendation {
 
 export async function recommendProperties(contactId: string): Promise<Recommendation[]> {
   if (api.enabled) {
-    const res = await api.get<{ items: Recommendation[] }>(`/ai/recommend?contactId=${encodeURIComponent(contactId)}`);
-    return res.items;
+    const { data } = await api.get<{ items: Recommendation[] }>(
+      `/ai/recommend?contactId=${encodeURIComponent(contactId)}`
+    );
+    return data.items;
   }
   await delay(320);
   return [
@@ -48,7 +50,10 @@ export async function recommendProperties(contactId: string): Promise<Recommenda
 
 export async function nextBestAction(contactId: string): Promise<{ title: string; detail: string }> {
   if (api.enabled) {
-    return api.get<{ title: string; detail: string }>(`/ai/next-best-action?contactId=${encodeURIComponent(contactId)}`);
+    const { data } = await api.get<{ title: string; detail: string }>(
+      `/ai/next-best-action?contactId=${encodeURIComponent(contactId)}`
+    );
+    return data;
   }
   await delay(260);
   return { title: 'Schedule a follow-up call', detail: 'They opened your brochure twice yesterday. Propose a 10–15 min call.' };

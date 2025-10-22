@@ -1,7 +1,7 @@
 """Add brochure_templates and FKs on brochure_drafts
 
-Revision ID: 006_brochure_templates_fk
-Revises: 005_brochure_drafts
+Revision ID: ae5d1c000103
+Revises: ae5d1c000102
 Create Date: 2025-10-17 12:30:00
 
 """
@@ -12,10 +12,10 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "006_brochure_templates_fk"
-down_revision: Union[str, None] = "005_brochure_drafts"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000103"
+down_revision = "ae5d1c000102"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -76,4 +76,3 @@ def downgrade() -> None:
     op.drop_column("brochure_drafts", "contact_id")
     op.drop_column("brochure_drafts", "template_id")
     op.drop_table("brochure_templates")
-

@@ -9,7 +9,7 @@
  * Phase: Track 2.4 - Rendering Components
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ContentType as SchemaContentType } from '../../types/contentSchemas';
 import { 
   exportContent, 
@@ -24,17 +24,15 @@ interface ExportToolbarProps {
   taskId: string;
   contentType: SchemaContentType;
   exportedAt?: string;
-  exportFormats?: string[];
   className?: string;
 }
 
-export const ExportToolbar: React.FC<ExportToolbarProps> = ({
+export const ExportToolbar = ({
   taskId,
   contentType,
   exportedAt,
-  exportFormats = [],
   className = '',
-}) => {
+}: ExportToolbarProps) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<string>('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -55,10 +53,10 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
     });
 
     if (result.success) {
-      setExportStatus('✓ PDF downloaded');
+      setExportStatus('PDF downloaded');
       setTimeout(() => setExportStatus(''), 3000);
     } else {
-      setExportStatus(`✗ ${result.error || 'Export failed'}`);
+      setExportStatus(result.error ? f'Export failed: {result.error}' : 'Export failed');
       setTimeout(() => setExportStatus(''), 5000);
     }
 
@@ -79,10 +77,10 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
       setShareUrl(result.shareUrl);
       setExpiresAt(result.expiresAt || null);
       setShowShareDialog(true);
-      setExportStatus('✓ Share link generated');
+      setExportStatus('Share link generated');
       setTimeout(() => setExportStatus(''), 3000);
     } else {
-      setExportStatus(`✗ ${result.error || 'Failed to generate link'}`);
+      setExportStatus(result.error ? f'Failed to generate link: {result.error}' : 'Failed to generate link');
       setTimeout(() => setExportStatus(''), 5000);
     }
 
@@ -93,10 +91,10 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
     if (shareUrl) {
       const success = await copyShareLink(shareUrl);
       if (success) {
-        setExportStatus('✓ Link copied to clipboard');
+        setExportStatus('Link copied to clipboard');
         setTimeout(() => setExportStatus(''), 2000);
       } else {
-        setExportStatus('✗ Failed to copy link');
+        setExportStatus('Failed to copy link');
         setTimeout(() => setExportStatus(''), 3000);
       }
     }
@@ -150,7 +148,7 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
         )}
 
         {exportStatus && !isExporting && (
-          <div className={`status-indicator ${exportStatus.startsWith('✓') ? 'success' : 'error'}`}>
+          <div className={`status-indicator ${exportStatus.startsWith('✓') 'success' : 'error'}`}>
             <span>{exportStatus}</span>
           </div>
         )}
@@ -167,7 +165,7 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({
 
         {status && status.export_count > 0 && (
           <div className="export-badge">
-            <span>{status.export_count} {status.export_count === 1 ? 'export' : 'exports'}</span>
+            <span>{status.export_count} {status.export_count === 1 'export' : 'exports'}</span>
             {status.formats_available.length > 0 && (
               <span className="formats">({status.formats_available.join(', ')})</span>
             )}

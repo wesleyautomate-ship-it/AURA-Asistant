@@ -11,8 +11,7 @@
 
 import { ContentType as SchemaContentType } from '../types/contentSchemas';
 import { useCommandStore } from '../store/commandStore';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from '../services/http';
 
 export interface ExportOptions {
   taskId: string;
@@ -42,28 +41,18 @@ export const exportAsPDF = async (options: ExportOptions): Promise<ExportResult>
   console.time('PDF Export');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/export`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token if needed
-        // 'Authorization': `Bearer ${getAuthToken()}`,
-      },
-      body: JSON.stringify({
+    const response = await api.post<Blob>(
+      '/export',
+      {
         task_id: taskId,
         content_type: contentType,
         format: 'pdf',
         include_branding: includeBranding,
-      }),
-    });
+      },
+      { responseType: 'blob' }
+    );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `Export failed with status ${response.status}`);
-    }
-
-    // Get filename from Content-Disposition header or generate one
-    const contentDisposition = response.headers.get('Content-Disposition');
+    const contentDisposition = response.headers['content-disposition'];
     let filename = `${contentType.toLowerCase()}_${taskId}.pdf`;
     
     if (contentDisposition) {
@@ -74,7 +63,7 @@ export const exportAsPDF = async (options: ExportOptions): Promise<ExportResult>
     }
 
     // Download the PDF file
-    const blob = await response.blob();
+    const blob = response.data;
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -123,27 +112,19 @@ export const exportAsHTML = async (options: ExportOptions): Promise<ExportResult
   console.time('HTML Export');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/export`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token if needed
-        // 'Authorization': `Bearer ${getAuthToken()}`,
-      },
-      body: JSON.stringify({
+    const { data } = await api.post<{
+      share_url: string;
+      expires_at?: string;
+      message?: string;
+    }>(
+      '/export',
+      {
         task_id: taskId,
         content_type: contentType,
         format: 'html',
         include_branding: includeBranding,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `Export failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
+      }
+    );
 
     if (!data.share_url) {
       throw new Error('No share URL returned from server');
@@ -229,19 +210,7 @@ export const revokeShareLink = async (taskId: string): Promise<boolean> => {
   console.log('[Export] Revoking share link for task:', taskId);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/export/revoke/${taskId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token if needed
-        // 'Authorization': `Bearer ${getAuthToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Revoke failed with status ${response.status}`);
-    }
-
+    await api.post('/export/revoke/' + taskId);
     console.log('[Export] Share link revoked successfully');
     return true;
   } catch (error) {
@@ -255,18 +224,7 @@ export const revokeShareLink = async (taskId: string): Promise<boolean> => {
  */
 export const getExportStatus = async (taskId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/export/status/${taskId}`, {
-      headers: {
-        // Add auth token if needed
-        // 'Authorization': `Bearer ${getAuthToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
+    const { data } = await api.get(`/export/status/${taskId}`);
     return data;
   } catch (error) {
     console.error('[Export] Failed to get export status:', error);

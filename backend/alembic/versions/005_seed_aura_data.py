@@ -1,7 +1,7 @@
 ﻿"""Seed AURA data: Templates, Dubai market data, workflow packages
 
-Revision ID: 005_seed_aura_data
-Revises: 004_aura_core_entities
+Revision ID: ae5d1c000105
+Revises: ae5d1c000104
 Create Date: 2025-09-24 13:45:00
 
 """
@@ -13,10 +13,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "005_seed_aura_data"
-down_revision: Union[str, None] = "004_aura_core_entities"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000105"
+down_revision = "ae5d1c000104"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

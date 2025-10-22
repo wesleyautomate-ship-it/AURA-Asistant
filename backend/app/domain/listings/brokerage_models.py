@@ -25,6 +25,7 @@ from datetime import datetime
 import json
 
 from . import Base
+from app.core.models import Brokerage
 
 # Import models that are referenced in relationships (temporarily disabled to resolve import issues)
 # try:
@@ -40,117 +41,6 @@ from . import Base
 #         __tablename__ = "retention_analytics"
 #         id = Column(Integer, primary_key=True, index=True)
 #         brokerage = relationship("Brokerage", back_populates="retention_analytics")
-
-
-class Brokerage(Base):
-    __tablename__ = "brokerages"
-    __table_args__ = {"extend_existing": True}
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False, index=True)
-    license_number = Column(String(100), unique=True, nullable=True, index=True)
-    address = Column(Text, nullable=True)
-    phone = Column(String(50), nullable=True)
-    email = Column(String(255), nullable=True)
-    website = Column(String(255), nullable=True)
-    logo_url = Column(String(500), nullable=True)
-    branding_config = Column(Text, default="{}")  # JSONB equivalent
-    is_active = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # Relationships
-    users = relationship("User", back_populates="brokerage")
-    team_performance = relationship(
-        "TeamPerformance", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    knowledge_base = relationship(
-        "KnowledgeBase", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    brand_assets = relationship(
-        "BrandAsset", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    ai_brand_assets = relationship(
-        "AIBrandAsset", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    workflow_automation = relationship(
-        "WorkflowAutomation", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    client_nurturing = relationship(
-        "ClientNurturing", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    compliance_rules = relationship(
-        "ComplianceRule", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    agent_consistency_metrics = relationship(
-        "AgentConsistencyMetric",
-        back_populates="brokerage",
-        cascade="all, delete-orphan",
-    )
-    lead_retention_analytics = relationship(
-        "LeadRetentionAnalytic",
-        back_populates="brokerage",
-        cascade="all, delete-orphan",
-    )
-    workflow_efficiency_metrics = relationship(
-        "WorkflowEfficiencyMetric",
-        back_populates="brokerage",
-        cascade="all, delete-orphan",
-    )
-
-    # Phase 3 Advanced Models relationships
-    predictive_models = relationship(
-        "PredictivePerformanceModel",
-        back_populates="brokerage",
-        cascade="all, delete-orphan",
-    )
-    benchmarking_data = relationship(
-        "BenchmarkingData", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    activity_analytics = relationship(
-        "UserActivityAnalytic", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-
-    # AI Assistant relationships
-    ai_requests = relationship(
-        "AIRequest", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    ai_requests_new = relationship(
-        "AIRequestNew", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    rera_compliance_data = relationship(
-        "RERAComplianceData", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    retention_analytics = relationship(
-        "RetentionAnalytic", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    voice_requests = relationship(
-        "VoiceRequest", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    task_automations = relationship(
-        "TaskAutomation", back_populates="brokerage", cascade="all, delete-orphan"
-    )
-    nurturing_sequences = relationship(
-        "SmartNurturingSequence",
-        back_populates="brokerage",
-        cascade="all, delete-orphan",
-    )
-
-    def __repr__(self):
-        return f"<Brokerage(id={self.id}, name='{self.name}', license='{self.license_number}')>"
-
-    @property
-    def branding_config_dict(self):
-        """Get branding config as dictionary"""
-        try:
-            return json.loads(self.branding_config) if self.branding_config else {}
-        except (json.JSONDecodeError, TypeError):
-            return {}
-
-    @branding_config_dict.setter
-    def branding_config_dict(self, value):
-        """Set branding config from dictionary"""
-        self.branding_config = json.dumps(value) if value else "{}"
 
 
 class TeamPerformance(Base):

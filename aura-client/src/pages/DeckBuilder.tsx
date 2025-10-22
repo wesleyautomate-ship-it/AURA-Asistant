@@ -5,7 +5,7 @@
  * Supports full-screen presentation mode and export functionality
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, 

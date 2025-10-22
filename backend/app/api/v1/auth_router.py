@@ -258,7 +258,17 @@ async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
                 },
             )
 
-        if datetime.utcnow() > session_data.expires_at:
+        expires_at = session_data.expires_at
+        if isinstance(expires_at, str):
+            try:
+                expires_at = datetime.fromisoformat(expires_at)
+            except ValueError:
+                try:
+                    expires_at = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    expires_at = datetime.utcnow()
+
+        if datetime.utcnow() > expires_at:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={

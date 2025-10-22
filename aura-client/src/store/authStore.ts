@@ -1,260 +1,259 @@
-/**
- * Authentication Store
- * ====================
- * 
- * Lightweight development-mode auth store that maintains fake authentication
- * so the rest of the app can function normally until full login integration is ready.
- * 
- * Features:
- * - Fake user session that persists across page reloads
- * - Development token that works with API calls
- * - Safe fallbacks for components expecting auth state
- * - Easy switching between dev and production modes
- */
-
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { login as loginApi, logout as logoutApi } from '../services/authApi'
+import api, { storeTokens, clearTokens } from '../services/http'
 
-// Development mode configuration
-const DEV_MODE = import.meta.env.MODE === 'development'
+const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true'
 const DEV_TOKEN = 'dev-token-12345-aura-ai'
 
-// User interface
+const getStorage = () => (typeof window !== 'undefined' ? window.localStorage : null)
+
 export interface User {
   id: string
   email: string
   name: string
   role: string
+  firstName?: string
+  lastName?: string
   avatar?: string
-  preferences?: Record<string, any>
+  preferences?: Record<string, unknown>
 }
 
-// Auth store interface
-interface AuthStore {
-  // State
+export interface LoginCredentials {
+  email: string
+  password: string
+}
+
+type AuthMode = 'api' | 'mock'
+
+interface AuthState {
   user: User | null
-  token: string | null
+  accessToken: string | null
+  refreshToken: string | null
+  tokenExpiresAt: number | null
   isAuthenticated: boolean
   isLoading: boolean
-  
-  // Actions
-  login: (credentials?: any) => Promise<void>
+  error: string | null
+  mode: AuthMode
+  login: (credentials: LoginCredentials) => Promise<void>
   logout: () => void
   updateUser: (updates: Partial<User>) => void
-  refreshToken: () => Promise<void>
-  
-  // Development helpers
+  refreshAccessToken: () => Promise<boolean>
   setDevMode: (enabled: boolean) => void
 }
 
-// Create the auth store with persistence
-export const useAuthStore = create<AuthStore>()(
+const buildUser = (payload: any): User => {
+  const derivedName = [payload.first_name, payload.last_name]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  const fallbackName = (derivedName || payload.email || 'Aura User') as string
+
+  return {
+    id: String(payload.id ?? payload.user_id ?? 'user'),
+    email: payload.email ?? 'user@propertypro.ai',
+    name: payload.name ?? fallbackName,
+    role: payload.role ?? 'agent',
+    firstName: payload.first_name,
+    lastName: payload.last_name,
+    avatar: payload.avatar ?? undefined,
+    preferences: payload.preferences,
+  }
+}
+
+const persistTokens = (accessToken: string | null, refreshToken: string | null) => {
+  if (accessToken) {
+    storeTokens(accessToken, refreshToken)
+  } else {
+    clearTokens()
+  }
+}
+
+const defaultDevUser: User = {
+  id: 'dev-user-001',
+  email: 'admin@propertypro.ai',
+  name: 'Aura Developer',
+  role: 'admin',
+  firstName: 'Aura',
+  lastName: 'Developer',
+  preferences: {
+    theme: 'dark',
+    notifications: true,
+  },
+}
+
+export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Initialize with fake dev data if in development mode
-      user: DEV_MODE ? {
-        id: 'dev-user-001',
-        email: 'admin@aura.ai',
-        name: 'AURA Developer',
-        role: 'admin',
-        avatar: 'ðŸ¤–',
-        preferences: {
-          theme: 'dark',
-          notifications: true,
-          autoSave: true
-        }
-      } : null,
-      
-      token: (() => {
-        if (typeof window === 'undefined') return null;
-        if (DEV_MODE) {
-          // Always ensure token is set in localStorage for dev mode
-          localStorage.setItem('authToken', DEV_TOKEN);
-          console.log('[AuthStore] Dev token set in localStorage:', DEV_TOKEN);
-          return DEV_TOKEN;
-        }
-        return localStorage.getItem('authToken');
-      })(),
-      isAuthenticated: (() => {
-        if (typeof window === 'undefined') return false;
-        if (DEV_MODE) return true;
-        return Boolean(localStorage.getItem('authToken'));
-      })(),
+      user: USE_REAL_API ? null : defaultDevUser,
+      accessToken: USE_REAL_API ? null : DEV_TOKEN,
+      refreshToken: USE_REAL_API ? null : DEV_TOKEN,
+      tokenExpiresAt: null,
+      isAuthenticated: !USE_REAL_API,
       isLoading: false,
+      error: null,
+      mode: USE_REAL_API ? 'api' : 'mock',
 
-      // Login method - fake for development, real for production
-      login: async (credentials?: any) => {
-        set({ isLoading: true })
-        
-        try {
-          if (DEV_MODE) {
-            // Simulate API delay in development
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            
-            console.log('[AuthStore] Developer mode active - fake user session loaded')
-            console.log('[AuthStore] Using static token:', DEV_TOKEN)
-            
-            set({
-              user: {
-                id: 'dev-user-001',
-                email: credentials?.email || 'admin@aura.ai',
-                name: 'AURA Developer',
-                role: 'admin',
-                avatar: '🤖',
-                preferences: {
-                  theme: 'dark',
-                  notifications: true,
-                  autoSave: true
-                }
-              },
-              token: DEV_TOKEN,
-              isAuthenticated: true,
-              isLoading: false
-            })
-            
-            // Set token in localStorage for API client
-            localStorage.setItem('authToken', DEV_TOKEN)
-            
-          } else {
-            // TODO: Real authentication logic for production
-            throw new Error('Production authentication not implemented yet')
-          }
-        } catch (error) {
-          console.error('[AuthStore] Login failed:', error)
-          set({ 
-            user: null, 
-            token: null, 
-            isAuthenticated: false, 
-            isLoading: false 
+      login: async ({ email, password }: LoginCredentials) => {
+        set({ isLoading: true, error: null })
+
+        if (!USE_REAL_API) {
+          await new Promise((resolve) => setTimeout(resolve, 350))
+          persistTokens(DEV_TOKEN, DEV_TOKEN)
+          set({
+            user: { ...defaultDevUser, email },
+            accessToken: DEV_TOKEN,
+            refreshToken: DEV_TOKEN,
+            tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
           })
-          throw error
-        }
-      },
-
-      // Logout method
-      logout: () => {
-        console.log('[AuthStore] Logging out user')
-        
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false
-        })
-        
-        // Clear tokens from storage
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('auth_token')
-        sessionStorage.removeItem('authToken')
-        
-        console.log('[AuthStore] User session cleared')
-      },
-
-      // Update user profile
-      updateUser: (updates: Partial<User>) => {
-        const currentUser = get().user
-        if (currentUser) {
-          const updatedUser = { ...currentUser, ...updates }
-          set({ user: updatedUser })
-          console.log('[AuthStore] User profile updated:', updates)
-        }
-      },
-
-      // Refresh token (no-op in dev mode)
-      refreshToken: async () => {
-        if (DEV_MODE) {
-          console.log('[AuthStore] Token refresh skipped in dev mode')
           return
         }
-        
-        // TODO: Real token refresh logic for production
-        set({ isLoading: true })
+
         try {
-          // Implement refresh token logic here
-          console.log('[AuthStore] Token refreshed')
-        } finally {
-          set({ isLoading: false })
+          const data = await loginApi(email, password)
+          const user = buildUser(data.user)
+          const expiresIn = Number(data.expires_in ?? 0)
+          const expiresAt = expiresIn > 0 ? Date.now() + expiresIn * 1000 : null
+
+          persistTokens(data.access_token, data.refresh_token ?? null)
+
+          set({
+            user,
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token ?? null,
+            tokenExpiresAt: expiresAt,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          })
+        } catch (error) {
+          persistTokens(null, null)
+          set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Authentication failed.',
+          })
+          throw error instanceof Error ? error : new Error('Authentication failed.')
         }
       },
 
-      // Development mode toggle
+      logout: () => {
+        logoutApi()
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+        })
+      },
+
+      updateUser: (updates: Partial<User>) => {
+        const current = get().user
+        if (!current) return
+        set({ user: { ...current, ...updates } })
+      },
+
+      refreshAccessToken: async () => {
+        if (!USE_REAL_API) {
+          return true
+        }
+
+        const refreshToken = get().refreshToken
+        if (!refreshToken) {
+          get().logout()
+          return false
+        }
+
+        try {
+          const { data } = await api.post<{ access_token: string; refresh_token?: string; expires_in?: number }>(
+            '/auth/refresh',
+            { refresh_token: refreshToken }
+          )
+          const expiresIn = Number(data.expires_in ?? 0)
+          const expiresAt = expiresIn > 0 ? Date.now() + expiresIn * 1000 : null
+
+          persistTokens(data.access_token, data.refresh_token ?? refreshToken)
+          set({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token ?? refreshToken,
+            tokenExpiresAt: expiresAt,
+            isAuthenticated: true,
+          })
+          return true
+        } catch (error) {
+          console.error('[AuthStore] Failed to refresh token:', error)
+          get().logout()
+          return false
+        }
+      },
+
       setDevMode: (enabled: boolean) => {
         if (enabled) {
-          console.log('[AuthStore] Enabling dev mode with fake auth')
+          persistTokens(DEV_TOKEN, DEV_TOKEN)
           set({
-            user: {
-              id: 'dev-user-001',
-              email: 'admin@aura.ai',
-              name: 'AURA Developer',
-              role: 'admin',
-              avatar: '🤖'
-            },
-            token: DEV_TOKEN,
-            isAuthenticated: true
+            user: defaultDevUser,
+            accessToken: DEV_TOKEN,
+            refreshToken: DEV_TOKEN,
+            tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+            isAuthenticated: true,
+            mode: 'mock',
           })
-          localStorage.setItem('authToken', DEV_TOKEN)
         } else {
-          console.log('[AuthStore] Disabling dev mode')
-          get().logout()
+          persistTokens(null, null)
+          set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            isAuthenticated: false,
+            mode: 'api',
+          })
         }
-      }
+      },
     }),
     {
-      name: 'aura-auth', // localStorage key
+      name: 'aura-auth',
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated
-      })
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        tokenExpiresAt: state.tokenExpiresAt,
+        isAuthenticated: state.isAuthenticated,
+        mode: state.mode,
+      }),
     }
   )
 )
 
-// Initialize development token on store creation
-if (DEV_MODE) {
-  // Ensure localStorage has the dev token for API calls
-  const currentToken = localStorage.getItem('authToken')
-  if (!currentToken) {
-    localStorage.setItem('authToken', DEV_TOKEN)
-    console.log('[AuthStore] Development token initialized in localStorage')
-  }
-  
-  // Log dev mode status
-  console.log('[AuthStore] Developer mode active - fake authentication enabled')
-  console.log('[AuthStore] Current user:', useAuthStore.getState().user?.name)
+if (!USE_REAL_API) {
+  persistTokens(DEV_TOKEN, DEV_TOKEN)
 }
 
-// Export convenience hooks
 export const useAuth = () => {
-  const { user, isAuthenticated, isLoading } = useAuthStore()
-  return { user, isAuthenticated, isLoading }
+  const { user, isAuthenticated, isLoading, error, mode } = useAuthStore()
+  return { user, isAuthenticated, isLoading, error, mode }
 }
 
 export const useAuthActions = () => {
-  const { login, logout, updateUser, refreshToken } = useAuthStore()
-  return { login, logout, updateUser, refreshToken }
+  const { login, logout, updateUser, refreshAccessToken, setDevMode } = useAuthStore()
+  return { login, logout, updateUser, refreshAccessToken, setDevMode }
 }
 
-// Export helper functions
-export const getAuthToken = (): string | null => {
-  return useAuthStore.getState().token
-}
-
-export const isUserAuthenticated = (): boolean => {
-  return useAuthStore.getState().isAuthenticated
-}
-
-export const getCurrentUser = (): User | null => {
-  return useAuthStore.getState().user
-}
-
-// Development helpers
-export const enableDevAuth = () => {
-  useAuthStore.getState().setDevMode(true)
-}
-
-export const disableDevAuth = () => {
-  useAuthStore.getState().setDevMode(false)
-}
+export const getAuthToken = (): string | null => useAuthStore.getState().accessToken
+export const isUserAuthenticated = (): boolean => useAuthStore.getState().isAuthenticated
+export const getCurrentUser = (): User | null => useAuthStore.getState().user
+export const enableDevAuth = () => useAuthStore.getState().setDevMode(true)
+export const disableDevAuth = () => useAuthStore.getState().setDevMode(false)
 
 export default useAuthStore

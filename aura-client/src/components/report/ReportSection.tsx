@@ -9,7 +9,7 @@
  * Phase: Track 2.4 - Rendering Components
  */
 
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Section } from '../../types/contentSchemas';
 
 interface ReportSectionProps {

@@ -1,0 +1,32 @@
+*** Begin Patch
+*** Update File: aura-client/src/components/report/ExportToolbar.tsx
+@@
+-interface ExportToolbarProps {
+-  taskId: string;
+-  contentType: SchemaContentType;
+-  exportedAt?: string;
+-  exportFormats?: string[];
+-  className?: string;
+-}
+-
+-export const ExportToolbar: React.FC<ExportToolbarProps> = ({
+-  taskId,
+-  contentType,
+-  exportedAt,
+-  exportFormats = [],
+-  className = '',
+-}) => {
++interface ExportToolbarProps {
++  taskId: string;
++  contentType: SchemaContentType;
++  exportedAt?: string;
++  className?: string;
++}
++
++export const ExportToolbar = ({
++  taskId,
++  contentType,
++  exportedAt,
++  className = '',
++}: ExportToolbarProps) => {
+*** End Patch

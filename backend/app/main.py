@@ -80,6 +80,14 @@ except ImportError as e:
     property_router = None
 
 try:
+    from app.api.v1.properties_router import router as properties_router
+
+    logger.info("Properties router loaded")
+except ImportError as e:
+    logger.warning(f"Properties router not loaded: {e}")
+    properties_router = None
+
+try:
     from app.api.v1.clients_router import router as clients_router
 
     logger.info("Clients router loaded")
@@ -146,6 +154,14 @@ try:
 except ImportError as e:
     logger.warning(f"Feedback router not loaded: {e}")
     feedback_router = None
+
+try:
+    from app.api.v1.templates_router import router as templates_router
+
+    logger.info("Templates router loaded")
+except ImportError as e:
+    logger.warning(f"Templates router not loaded: {e}")
+    templates_router = None
 
 try:
     from app.api.v1.admin_router import (
@@ -478,13 +494,21 @@ except ImportError as e:
     tasks_router = None
 
 # Import models from clean architecture
+# NOTE: Temporarily disabled to prevent table redefinition conflicts
+# The specific models needed by routers are imported directly in their respective files
 try:
-    from app.domain.listings.brokerage_models import *
-    from app.domain.listings.phase3_advanced_models import *
-    from app.domain.listings.ai_assistant_models import *
-    from app.core.models import *
+    # Only import core models for basic functionality
+    from app.core.models import User, UserSession, Permission, Role, AuditLog
+    from app.core.models import ChatThread, ChatMessage
+    from app.core.models import BrochureDraft, BrochureTemplate
+    from app.core.models import Property, PropertyPhoto, PropertyType, PropertyStatus
+    
+    # Commented out to prevent "properties" table redefinition:
+    # from app.domain.listings.brokerage_models import *
+    # from app.domain.listings.phase3_advanced_models import *
+    # from app.domain.listings.ai_assistant_models import *
 
-    logger.info("Models loaded")
+    logger.info("Core models loaded (selective import to prevent conflicts)")
 except ImportError as e:
     logger.warning(f"Some models could not be imported: {e}")
 
@@ -614,6 +638,10 @@ if property_router:
     )  # Legacy compatibility for existing clients
     logger.info("Property router included at /api/v1/properties and /api/properties")
 
+if properties_router:
+    app.include_router(properties_router, tags=["Properties"])
+    logger.info("Properties router included at /api/v1/properties")
+
 if clients_router:
     app.include_router(clients_router, tags=["Clients"])
     logger.info("Clients router included at /api/v1/clients")
@@ -657,6 +685,21 @@ try:
 except Exception as e:
     logger.warning(f"Failed to mount /uploads: {e}")
 
+# Asset serving for storage service
+try:
+    from app.services.storage_service import get_storage_service
+    from fastapi import Path as PathParam
+    
+    @app.get("/api/v1/assets/{asset_path:path}")
+    async def serve_asset(asset_path: str = PathParam(...)):
+        """Serve assets from storage service"""
+        storage = get_storage_service()
+        return storage.serve_file(asset_path)
+        
+    logger.info("Asset serving route mounted at /api/v1/assets/")
+except Exception as e:
+    logger.warning(f"Failed to mount asset serving: {e}")
+
 if performance_router:
     app.include_router(
         performance_router, prefix="/api/performance", tags=["Performance"]
@@ -698,19 +741,15 @@ if pdf_feature_enabled:
         app.include_router(export_router, tags=["Export"])
         app.include_router(brochures_router, tags=["Brochures"])
 
-        try:
-            from app.api.v1.templates_router import router as templates_router
-
-            app.include_router(templates_router, tags=["Brochures"])
-            logger.info("Templates router included at /api/v1/templates")
-        except ImportError as e:
-            logger.warning(f"Templates router not loaded: {e}")
-
         logger.info("Export router included at /api/v1/export")
     except ImportError as e:
         logger.warning(f"Export router not loaded: {e}")
 else:
     logger.info("Export/brochure routers skipped (PDF optional features disabled)")
+
+if templates_router:
+    app.include_router(templates_router)
+    logger.info("Templates router included at /api/v1/templates")
 
 if health_v1_router:
     app.include_router(health_v1_router, prefix="/api/v1", tags=["Health"])

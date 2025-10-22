@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ContactDetailHeader from '../../components/contacts/ContactDetailHeader';
 import AIActionBar from '../../components/contacts/AIActionBar';

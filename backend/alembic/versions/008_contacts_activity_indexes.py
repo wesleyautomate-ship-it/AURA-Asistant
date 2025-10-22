@@ -1,7 +1,7 @@
 """Add activity-related indexes and columns
 
-Revision ID: 008_contacts_activity_indexes
-Revises: 007_followups_status
+Revision ID: ae5d1c000109
+Revises: ae5d1c000108
 Create Date: 2025-10-18 01:00:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "008_contacts_activity_indexes"
-down_revision: Union[str, None] = "007_followups_status"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000109"
+down_revision = "ae5d1c000108"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -104,4 +104,3 @@ def downgrade() -> None:
 
     op.drop_index("idx_clients_last_activity_desc", table_name="clients")
     op.drop_column("clients", "last_activity_at")
-

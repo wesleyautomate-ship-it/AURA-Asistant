@@ -1,4 +1,3 @@
-import React from 'react';
 import { MessageSquare, FileText, Lightbulb, Sparkles, Calendar } from 'lucide-react';
 
 export interface AIActionBarProps {

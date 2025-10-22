@@ -9,7 +9,7 @@
  * Phase: Track 2.4 - Rendering Components
  */
 
-import React from 'react';
+import { Fragment } from 'react';
 
 interface SkeletonLoaderProps {
   variant?: 'text' | 'title' | 'card' | 'metric' | 'full-page';
@@ -17,11 +17,11 @@ interface SkeletonLoaderProps {
   className?: string;
 }
 
-export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
+export const SkeletonLoader = ({
   variant = 'text',
   count = 1,
   className = '',
-}) => {
+}: SkeletonLoaderProps) => {
   const renderSkeleton = () => {
     switch (variant) {
       case 'title':
@@ -74,7 +74,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   return (
     <div className={`skeleton-loader ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
-        <React.Fragment key={index}>{renderSkeleton()}</React.Fragment>
+        <Fragment key={index}>{renderSkeleton()}</Fragment>
       ))}
 
       <style>{`

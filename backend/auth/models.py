@@ -12,16 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-# Import Brokerage model to resolve relationship
-try:
-    from app.domain.listings.brokerage_models import Brokerage
-except ImportError:
-    # If Brokerage model is not available, define a placeholder
-    class Brokerage(Base):
-        __tablename__ = "brokerages"
-        id = Column(Integer, primary_key=True, index=True)
-        name = Column(String(255), nullable=False, index=True)
-        users = relationship("User", back_populates="brokerage")
+from app.core.models import Brokerage
 
 # Association tables for many-to-many relationships
 role_permissions = Table(

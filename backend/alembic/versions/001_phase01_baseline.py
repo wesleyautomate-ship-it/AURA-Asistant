@@ -1,7 +1,7 @@
 """Phase 01 baseline: Users, Sessions, RBAC
 
-Revision ID: 001_phase01_baseline
-Revises: 
+Revision ID: ae5d1c000001
+Revises: None
 Create Date: 2025-09-22 11:46:00.000000
 
 """
@@ -12,10 +12,10 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "001_phase01_baseline"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000001"
+down_revision = None
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

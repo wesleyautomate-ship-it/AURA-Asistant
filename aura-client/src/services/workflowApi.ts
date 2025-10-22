@@ -4,8 +4,48 @@
 
 import { enrichWorkflowPayload, EnrichedPayload } from './contextEnrichment';
 import { Intent } from './intentParser';
+import api from './http';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const normalizeEndpoint = (endpoint: string): string => {
+  const withoutOrigin = endpoint.replace(/^https?:\/\/[^/]+/, '')
+  const withoutPrefix = withoutOrigin.replace(/^\/api\/v1/, '')
+  if (!withoutPrefix.length) return '/'
+  return withoutPrefix.startsWith('/') ? withoutPrefix : `/${withoutPrefix}`
+}
+
+const applyEnrichmentMetadata = (
+  data: WorkflowResponse,
+  enrichment?: EnrichedPayload,
+  extraFields: string[] = [],
+  extraLog: string[] = []
+): WorkflowResponse => {
+  if (!enrichment) {
+    if (!extraFields.length && !extraLog.length) {
+      return data
+    }
+    return {
+      ...data,
+      enrichment: {
+        status: 'enriched',
+        inferredFields: extraFields,
+        debugLog: extraLog,
+      },
+    }
+  }
+
+  const inferredFields = Array.from(
+    new Set([...Object.keys(enrichment.inferredFields), ...extraFields])
+  )
+
+  return {
+    ...data,
+    enrichment: {
+      status: extraFields.length ? 'enriched' : enrichment.validationStatus,
+      inferredFields,
+      debugLog: enrichment.debugLog.concat(extraLog),
+    },
+  }
+}
 
 export interface WorkflowResponse {
   success: boolean;
@@ -29,150 +69,107 @@ async function makeValidatedAPICall(
 ): Promise<WorkflowResponse> {
   // Structured logging for debugging
   console.group(`[Workflow API] ${endpoint}`);
-  console.log('📤 Payload:', payload);
+  console.log('dY" Payload:', payload);
   if (enrichment) {
-    console.log('🔧 Enrichment Status:', enrichment.validationStatus);
-    console.log('🎯 Inferred Fields:', Object.keys(enrichment.inferredFields));
+    console.log('dY" Enrichment Status:', enrichment.validationStatus);
+    console.log('dYZ_ Inferred Fields:', Object.keys(enrichment.inferredFields));
     if (enrichment.debugLog.length > 0) {
-      console.log('📝 Debug Log:', enrichment.debugLog);
+      console.log('dY"? Debug Log:', enrichment.debugLog);
     }
   }
-  
+
   // --- v3.3.1 Auto-Healing Patch ---
-  if (payload && typeof payload === "object") {
+  if (payload && typeof payload === 'object') {
     for (const key of Object.keys(payload)) {
       if (payload[key] === null || payload[key] === undefined) {
-        payload[key] = ""; // prevent 422 by ensuring non-null values
+        payload[key] = '';
       }
     }
 
-    // Handle missing 'query' key (legacy requirement)
-    if (!("query" in payload)) {
-      payload.query = "_"; // safe placeholder for backend schema
+    if (!('query' in payload)) {
+      payload.query = '_';
     }
-    
-    // Ensure critical fields for different content types
+
     if (endpoint.includes('/cma/')) {
-      payload.location = payload.location || "Dubai";
-      payload.property_type = payload.property_type || "mixed";
+      payload.location = payload.location || 'Dubai';
+      payload.property_type = payload.property_type || 'mixed';
     }
     if (endpoint.includes('/social/')) {
-      payload.topic = payload.topic || payload.query || "Real Estate";
-      payload.platform = payload.platform || "instagram";
+      payload.topic = payload.topic || payload.query || 'Real Estate';
+      payload.platform = payload.platform || 'instagram';
     }
     if (endpoint.includes('/pitchdeck/')) {
-      payload.address = payload.address || payload.location || "Dubai";
-      payload.investment_type = payload.investment_type || "acquisition";
+      payload.address = payload.address || payload.location || 'Dubai';
+      payload.investment_type = payload.investment_type || 'acquisition';
     }
     if (endpoint.includes('/newsletter/')) {
-      payload.topic = payload.topic || payload.query || "Market Updates";
+      payload.topic = payload.topic || payload.query || 'Market Updates';
     }
-    
+
     console.log('[Auto-Heal] Enhanced payload:', payload);
   }
-  
+
+  const pathSegment = normalizeEndpoint(endpoint);
+
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    console.log('📥 Response Status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ API Error Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-        payload: payload // Include payload for debugging
-      });
-      
-      // 🛡️ Auto-retry logic for 422 validation errors
-      if (response.status === 422 && !payload._retryAttempt) {
-        console.warn('[WorkflowAPI] Auto-retrying after 422 with enhanced safe payload');
-        
-        // Create super-safe payload with all possible missing fields
-        const safePayload = {
-          ...payload,
-          query: payload.query || payload.location || "CMA",
-          _: payload._ || "auto",
-          property_type: payload.property_type || "mixed",
-          location: payload.location || "Dubai",
-          _retryAttempt: true // Prevent infinite retry
-        };
-        
-        console.log('[WorkflowAPI] Retry payload:', safePayload);
-        
-        // Retry the request with safe payload
-        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-          },
-          body: JSON.stringify(safePayload),
-        });
-        
-        if (retryResponse.ok) {
-          console.log('✅ Auto-retry successful!');
-          const retryData = await retryResponse.json();
-          console.log('✅ Retry Success Response:', retryData);
-          
-          const result: WorkflowResponse = {
-            ...retryData,
-            enrichment: enrichment ? {
-              status: 'enriched', // Mark as enriched due to auto-healing
-              inferredFields: Object.keys(enrichment.inferredFields).concat(['query', '_']),
-              debugLog: enrichment.debugLog.concat(['Auto-healed 422 error with safe payload'])
-            } : {
-              status: 'enriched',
-              inferredFields: ['query', '_'],
-              debugLog: ['Auto-healed 422 error with safe payload']
-            }
-          };
-          
-          console.groupEnd();
-          return result;
-        } else {
-          console.error('❌ Auto-retry also failed:', retryResponse.status);
-        }
-      }
-      
-      // Enhanced error message with payload context
-      throw new Error(
-        `API call failed: ${response.status} ${response.statusText}. ` +
-        `Payload: ${JSON.stringify(payload)}. ` +
-        `Response: ${errorText}`
-      );
-    }
-
-    const data = await response.json();
-    console.log('✅ Success Response:', data);
-    
-    // Include enrichment metadata in response
-    const result: WorkflowResponse = {
-      ...data,
-      enrichment: enrichment ? {
-        status: enrichment.validationStatus,
-        inferredFields: Object.keys(enrichment.inferredFields),
-        debugLog: enrichment.debugLog
-      } : undefined
-    };
-    
+    const { data } = await api.post<WorkflowResponse>(pathSegment, payload);
+    console.log('�o. Success Response:', data);
+    const result = applyEnrichmentMetadata(data, enrichment);
     console.groupEnd();
     return result;
-    
   } catch (error) {
-    console.error('💥 API Call Exception:', error);
+    const axiosError = error as AxiosError<any>;
+    const status = axiosError.response?.status;
+
+    if (status === 422 && !payload._retryAttempt) {
+      console.warn('[WorkflowAPI] Auto-retrying after 422 with enhanced safe payload');
+
+      const safePayload = {
+        ...payload,
+        query: payload.query || payload.location || 'CMA',
+        _: payload._ || 'auto',
+        property_type: payload.property_type || 'mixed',
+        location: payload.location || 'Dubai',
+        _retryAttempt: true,
+      };
+
+      console.log('[WorkflowAPI] Retry payload:', safePayload);
+
+      try {
+        const { data: retryData } = await api.post<WorkflowResponse>(pathSegment, safePayload);
+        console.log('�o. Auto-retry successful!');
+        console.log('�o. Retry Success Response:', retryData);
+        const result = applyEnrichmentMetadata(
+          retryData,
+          enrichment,
+          ['query', '_'],
+          ['Auto-healed 422 error with safe payload']
+        );
+        console.groupEnd();
+        return result;
+      } catch (retryError) {
+        console.error('[WorkflowAPI] Auto-retry also failed:', retryError);
+      }
+    }
+
+    const responseData = axiosError.response?.data;
+    console.error('�?O API Error Response:', {
+      status,
+      data: responseData,
+      payload,
+    });
+
     console.groupEnd();
-    throw error;
+    throw new Error(
+      `API call failed: ${status ?? 'unknown'} ${axiosError.message}. ` +
+      `Payload: ${JSON.stringify(payload)}. ` +
+      `Response: ${JSON.stringify(responseData)}`
+    );
   }
 }
+
+
+
 
 /**
  * Create a CMA (Comparative Market Analysis) report with validation
@@ -327,25 +324,8 @@ export async function createSocialPostLegacy(topic: string, context: string = ''
  */
 export async function checkTaskStatus(taskId: string): Promise<any> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/tasks/${taskId}/status`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Workflow] Task status check failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      throw new Error(`Task status check failed: ${response.status} ${response.statusText}`);
-    }
-
-    return await response.json();
+    const { data } = await api.get<any>(normalizeEndpoint(`/api/v1/tasks/${taskId}/status`));
+    return data;
   } catch (error) {
     console.error('[Workflow] Task status check error:', error);
     throw error;
@@ -384,26 +364,10 @@ export async function generateCMAReport(location: string): Promise<{ report_url:
   console.log(`[Workflow] Generating real CMA report for ${location}`);
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/cma/report`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-      },
-      body: JSON.stringify({ location }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Workflow] CMA Report API failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      throw new Error(`CMA Report API failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const { data } = await api.post<{ report_url: string; [key: string]: any }>(
+      normalizeEndpoint('/api/v1/cma/report'),
+      { location }
+    );
     console.log('[Workflow] CMA report generated successfully:', data.report_url);
     return {
       report_url: data.report_url || null,
@@ -584,31 +548,10 @@ export async function exportGeneratedContent(
                 'social_media_style'
     };
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('authToken') || import.meta.env.VITE_DEV_AUTH_TOKEN || 'mock-token'}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Workflow] Export failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
-      });
-      
-      // Return mock export URL for development
-      return {
-        export_url: `/mock-exports/${contentType}_${contentId}.${format}`,
-        message: `Mock export generated: ${contentType} as ${format.toUpperCase()}`
-      };
-    }
-
-    const data = await response.json();
+    const { data } = await api.post<{ export_url: string; message?: string }>(
+      normalizeEndpoint(endpoint),
+      payload
+    );
     console.log('[Workflow] Export completed:', data.export_url);
     
     return {

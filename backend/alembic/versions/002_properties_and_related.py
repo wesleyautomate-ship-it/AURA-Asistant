@@ -1,7 +1,7 @@
 """Add properties, listing_history, property_confidential tables
 
-Revision ID: 002_properties_and_related
-Revises: 001_phase01_baseline
+Revision ID: ae5d1c000002
+Revises: ae5d1c000001
 Create Date: 2025-09-23 08:57:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "002_properties_and_related"
-down_revision: Union[str, None] = "001_phase01_baseline"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000002"
+down_revision = "ae5d1c000001"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

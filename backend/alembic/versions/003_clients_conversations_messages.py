@@ -1,7 +1,7 @@
 """Add clients, conversations, messages tables
 
-Revision ID: 003_clients_conversations_messages
-Revises: 002_properties_and_related
+Revision ID: ae5d1c000003
+Revises: ae5d1c000002
 Create Date: 2025-09-23 09:27:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "003_clients_conversations_messages"
-down_revision: Union[str, None] = "002_properties_and_related"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000003"
+down_revision = "ae5d1c000002"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:

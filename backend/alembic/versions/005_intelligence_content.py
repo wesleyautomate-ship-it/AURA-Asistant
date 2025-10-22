@@ -1,7 +1,7 @@
 """Intelligence content storage
 
-Revision ID: 005_intelligence_content
-Revises: 004_aura_core_entities
+Revision ID: ae5d1c000101
+Revises: ae5d1c000004
 Create Date: 2024-10-11 10:18:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "005_intelligence_content"
-down_revision = "004_aura_core_entities"
+revision = "ae5d1c000101"
+down_revision = "ae5d1c000004"
 branch_labels = None
 depends_on = None
 

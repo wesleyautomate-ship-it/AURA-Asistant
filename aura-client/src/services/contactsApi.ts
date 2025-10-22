@@ -14,9 +14,9 @@ const inMemoryTags = new Map<string, string[]>();
 
 export async function getContacts(signal?: AbortSignal): Promise<Contact[]> {
   ensureRealApi();
-  const rows = await api.get<Array<Contact & { status?: string }>>(
+  const { data: rows } = await api.get<Array<Contact & { status?: string }>>(
     '/contacts',
-    signal,
+    { signal },
   );
   return rows.map((row) => ({
     ...row,
@@ -29,7 +29,7 @@ export async function getContactDetail(
   signal?: AbortSignal,
 ): Promise<ContactDetail> {
   ensureRealApi();
-  const detail = await api.get<any>(`/contacts/${id}`, signal);
+  const { data: detail } = await api.get<any>(`/contacts/${id}`, { signal });
   const timeline = await getTimeline(id, signal);
   const base: Contact = {
     id: detail.id ?? id,
@@ -54,9 +54,9 @@ export async function getTimeline(
   signal?: AbortSignal,
 ): Promise<ContactDetail['timeline']> {
   ensureRealApi();
-  const items = await api.get<
+  const { data: items } = await api.get<
     Array<{ id: string; type: string; at: string; text: string }>
-  >(`/contacts/${id}/activity`, signal);
+  >(`/contacts/${id}/activity`, { signal });
   return items.map((item) => ({
     id: item.id,
     ts: item.at,
@@ -120,9 +120,10 @@ export async function saveNotes(
   signal?: AbortSignal,
 ) {
   ensureRealApi();
-  return api.patch<{ id: string; notes: string; updatedAt: string }>(
+  const { data } = await api.patch<{ id: string; notes: string; updatedAt: string }>(
     `/contacts/${contactId}/notes`,
     { notes },
-    signal,
+    { signal },
   );
+  return data;
 }

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Contact } from '../../types/contacts';
 
 const tempStyles: Record<Contact['temperature'], { bg: string; text: string; dot: string }> = {

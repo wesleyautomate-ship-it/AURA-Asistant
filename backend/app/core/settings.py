@@ -43,9 +43,16 @@ CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8002"))
 ENABLE_PDF_WEASYPRINT = _get_bool("ENABLE_PDF_WEASYPRINT", False)
 ENABLE_VECTOR_CHROMA = _get_bool("ENABLE_VECTOR_CHROMA", False)
 
-# Optional Feature Flags
-ENABLE_PDF_WEASYPRINT = _get_bool("ENABLE_PDF_WEASYPRINT", False)
-ENABLE_VECTOR_CHROMA = _get_bool("ENABLE_VECTOR_CHROMA", False)
+# Property-Brochure Feature Flags
+PDF_FEATURE_ENABLED = _get_bool("PDF_FEATURE_ENABLED", True)
+BACKEND_ENABLED = _get_bool("BACKEND_ENABLED", True)
+
+# Asset Storage Configuration
+ASSET_STORAGE = os.getenv("ASSET_STORAGE", "local")
+ASSET_LOCAL_DIR = os.getenv("ASSET_LOCAL_DIR", "./storage")
+
+# API Configuration 
+API_BASE = os.getenv("API_BASE", "/api/v1")
 
 # CORS defaults
 _default_cors_origins = [
@@ -196,6 +203,12 @@ class Settings:
         self.CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS
         self.dev_auth_allow = DEV_AUTH_ALLOW
         self.DEV_AUTH_ALLOW = DEV_AUTH_ALLOW
+        # Property-Brochure Feature Flags
+        self.pdf_feature_enabled = PDF_FEATURE_ENABLED
+        self.backend_enabled = BACKEND_ENABLED
+        self.asset_storage = ASSET_STORAGE
+        self.asset_local_dir = ASSET_LOCAL_DIR
+        self.api_base = API_BASE
 
 
 def get_settings() -> Settings:
@@ -259,6 +272,11 @@ __all__ = [
     "OBJECT_STORE_PATH",
     "ENABLE_PDF_WEASYPRINT",
     "ENABLE_VECTOR_CHROMA",
+    "PDF_FEATURE_ENABLED",
+    "BACKEND_ENABLED", 
+    "ASSET_STORAGE",
+    "ASSET_LOCAL_DIR",
+    "API_BASE",
     "validate_settings",
     "Settings",
     "get_settings",

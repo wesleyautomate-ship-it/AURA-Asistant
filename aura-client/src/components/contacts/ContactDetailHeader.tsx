@@ -1,14 +1,12 @@
-import React from 'react';
-import { ChevronLeft, MoreVertical, Clock } from 'lucide-react';
+import { ChevronLeft, MoreVertical } from 'lucide-react';
 import { Contact } from '../../types/contacts';
 import { useNavigate } from 'react-router-dom';
 
 export interface ContactDetailHeaderProps {
   contact: Contact;
-  nextFollowUpLabel?: string;
 }
 
-export default function ContactDetailHeader({ contact, nextFollowUpLabel }: ContactDetailHeaderProps) {
+export default function ContactDetailHeader({ contact }: ContactDetailHeaderProps) {
   const navigate = useNavigate();
   const initials = contact.initials ?? getInitials(contact.name);
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { X, Calendar, Clock, Phone, Mail, MessageSquare, Users as UsersIcon } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { X, Clock, Phone, Mail, MessageSquare, Users as UsersIcon } from 'lucide-react';
 import type { FollowUpChannel } from '../../services/schedulesApi';
 
 export interface FollowUpModalProps {
@@ -8,7 +8,7 @@ export interface FollowUpModalProps {
   onSave: (data: { channel: FollowUpChannel; dueAt: string; notes?: string }) => void;
 }
 
-const CHANNELS: Array<{ value: FollowUpChannel; label: string; icon: React.ReactNode }> = [
+const CHANNELS: Array<{ value: FollowUpChannel; label: string; icon: ReactNode }> = [
   { value: 'call', label: 'Call', icon: <Phone className="w-4 h-4" /> },
   { value: 'email', label: 'Email', icon: <Mail className="w-4 h-4" /> },
   { value: 'whatsapp', label: 'WhatsApp', icon: <MessageSquare className="w-4 h-4" /> },

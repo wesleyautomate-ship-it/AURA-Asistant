@@ -1,7 +1,7 @@
 """Add contacts-related tables: contact_notes, activities, followups
 
-Revision ID: 006_contacts_crm
-Revises: 0eb8185a636d_consolidate_models
+Revision ID: ae5d1c000107
+Revises: ae5d1c000106
 Create Date: 2025-10-17 00:00:00
 
 """
@@ -11,10 +11,10 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "006_contacts_crm"
-down_revision: Union[str, None] = "0eb8185a636d_consolidate_models"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "ae5d1c000107"
+down_revision = "ae5d1c000106"
+branch_labels = None
+depends_on = None
 
 
 def upgrade() -> None:
@@ -73,4 +73,3 @@ def downgrade() -> None:
     op.drop_index("ix_contact_notes_created_at", table_name="contact_notes")
     op.drop_index("ix_contact_notes_contact_id", table_name="contact_notes")
     op.drop_table("contact_notes")
-

@@ -13,7 +13,7 @@
 import { ContentType, ValidationResult } from '../types/contentSchemas';
 import { useCommandStore } from '../store/commandStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api from './http';
 
 export interface EnrichmentRequest {
   contentType: ContentType;
@@ -88,28 +88,15 @@ const enrichWithBackend = async (
   request: EnrichmentRequest
 ): Promise<EnrichmentResult | null> => {
   try {
-    const endpoint = `/api/v1/enrich/${request.contentType.toLowerCase()}`;
-    
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('authToken') && {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }),
-      },
-      body: JSON.stringify({
-        payload: request.payload,
-        missing_fields: request.missingFields,
-        context: getEnrichmentContext(),
-      }),
+    const endpoint = `/enrich/${request.contentType.toLowerCase()}`;
+
+    const { data } = await api.post<EnrichmentResult>(endpoint, {
+      payload: request.payload,
+      missing_fields: request.missingFields,
+      context: getEnrichmentContext(),
     });
 
-    if (!response.ok) {
-      throw new Error(`Enrichment endpoint returned ${response.status}`);
-    }
-
-    return await response.json();
+    return data;
     
   } catch (error) {
     console.warn('Backend enrichment failed:', error);

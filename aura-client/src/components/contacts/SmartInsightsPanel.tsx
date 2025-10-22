@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface SmartInsightsPanelProps {
   intentScore?: number; // 0..100
   signals?: string[];

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import api from '../services/http';
 
 export interface BrochureInput {
   title?: string;
@@ -20,26 +20,15 @@ export interface BrochureResult {
 }
 
 export async function createBrochure(input: Partial<BrochureInput>): Promise<BrochureResult> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/export/brochure-mock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input || {}),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to create brochure: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+  const { data } = await api.post<BrochureResult>('/export/brochure-mock', input || {});
+  return data;
 }
 
 // Generic HTML save via export service; returns a file URL in BrochureResult shape
 export async function saveHtml(payload: { html: string; prefix?: string }): Promise<BrochureResult> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/export/html-save`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html: payload.html, prefix: payload.prefix || 'brochure' }),
+  const { data } = await api.post<BrochureResult>('/export/html-save', {
+    html: payload.html,
+    prefix: payload.prefix || 'brochure',
   });
-  if (!res.ok) {
-    throw new Error(`Failed to save HTML: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+  return data;
 }

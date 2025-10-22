@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Check, Share2, Copy, Download } from 'lucide-react';
 

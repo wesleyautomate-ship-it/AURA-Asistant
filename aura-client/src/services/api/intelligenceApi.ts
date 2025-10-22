@@ -31,10 +31,13 @@ import {
   IntelligenceContent,
   ProgressEventData
 } from '../../types/intelligence';
+import { getAuthToken, useAuthStore } from '../../store/authStore';
+import api from '../http'
+import { AxiosError, AxiosRequestConfig } from 'axios'
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const INTELLIGENCE_BASE = `${API_BASE_URL}/api/v1/intelligence`;
+const BASE_URL = api.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const INTELLIGENCE_BASE = `${BASE_URL.replace(/\/$/, '')}/intelligence`;
 
 // Check if mock mode is enabled
 const AURA_MOCK_MODE = import.meta.env.VITE_AURA_MOCK_MODE === 'true';
@@ -52,31 +55,10 @@ class IntelligenceApiError extends Error {
 }
 
 class IntelligenceApiClient {
-  private baseURL: string;
-  private authToken: string | null = null;
-  
-  constructor() {
-    this.baseURL = INTELLIGENCE_BASE;
-    this.loadAuthToken();
-  }
+  private baseURL: string
 
-  /**
-   * Load JWT token from storage
-   */
-  private loadAuthToken(): void {
-    try {
-      // Try multiple storage keys for compatibility
-      const token = 
-        localStorage.getItem('authToken') || 
-        localStorage.getItem('auth_token') ||
-        sessionStorage.getItem('authToken');
-      
-      if (token) {
-        this.authToken = token;
-      }
-    } catch (error) {
-      console.warn('Failed to load auth token:', error);
-    }
+  constructor() {
+    this.baseURL = INTELLIGENCE_BASE
   }
 
   /**
@@ -85,65 +67,67 @@ class IntelligenceApiClient {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-    };
-
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
     }
 
-    return headers;
+    const token = getAuthToken()
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    return headers
   }
 
   /**
    * Generic HTTP request handler with error handling
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
-    
+  private async request<T>(endpoint: string, options: RequestInit = {}, attempt = 0): Promise<T> {
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`
+
+    const axiosConfig: AxiosRequestConfig = {
+      url,
+      method: (options.method as AxiosRequestConfig['method']) ?? 'GET',
+      headers: {
+        ...this.getHeaders(),
+        ...(options.headers as Record<string, string> | undefined),
+      },
+      data: options.body,
+      signal: options.signal,
+    }
+
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...this.getHeaders(),
-          ...options.headers,
-        },
-      });
+      const response = await api.request<T>(axiosConfig)
+      return response.data
+    } catch (error) {
+      const axiosError = error as AxiosError<any>
 
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        let errorDetails = null;
-
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.detail || errorMessage;
-          errorDetails = errorData.details || errorData;
-        } catch {
-          // Use default error message if JSON parsing fails
+      if (axiosError.response?.status === 401 && attempt === 0) {
+        const refreshed = await useAuthStore.getState().refreshAccessToken()
+        if (refreshed) {
+          return this.request<T>(endpoint, options, attempt + 1)
         }
+      }
+
+      if (axiosError.response) {
+        const status = axiosError.response.status
+        const data = axiosError.response.data || {}
+        const message =
+          (typeof data === 'object' && (data.message || data.detail)) ||
+          axiosError.message ||
+          `HTTP ${status}`
 
         throw new IntelligenceApiError(
-          errorMessage,
-          response.status,
-          response.status === 422 ? 'validation_error' : 'api_error',
-          errorDetails
-        );
+          message,
+          status,
+          status === 422 ? 'validation_error' : 'api_error',
+          data?.details ?? data
+        )
       }
 
-      return await response.json();
-    } catch (error) {
-      if (error instanceof IntelligenceApiError) {
-        throw error;
-      }
-
-      // Network or other errors
       throw new IntelligenceApiError(
-        error instanceof Error ? error.message : 'Unknown error occurred',
+        axiosError.message || 'Unknown error occurred',
         0,
         'network_error'
-      );
+      )
     }
   }
 
@@ -245,74 +229,11 @@ class IntelligenceApiClient {
    * Subscribe to task progress updates via Server-Sent Events
    */
   async *streamTaskProgress(taskId: string): AsyncGenerator<ProgressEventData, void, unknown> {
-    const url = `${this.baseURL}/stream/${taskId}`;
-    
-    try {
-      const headers = this.getHeaders();
-      delete headers['Content-Type']; // Not needed for SSE
-      
-      const response = await fetch(url, { headers });
-
-      if (!response.ok) {
-        throw new IntelligenceApiError(
-          `Failed to start stream: HTTP ${response.status}`,
-          response.status
-        );
+    for await (const progress of this.pollTaskProgress(taskId)) {
+      yield progress
+      if (progress.status === TaskStatus.COMPLETED || progress.status === TaskStatus.FAILED) {
+        break
       }
-
-      if (!response.body) {
-        throw new IntelligenceApiError('No response body for SSE stream');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line
-
-          let currentEvent = 'message';
-          let currentData = '';
-
-          for (const line of lines) {
-            if (line.startsWith('event:')) {
-              currentEvent = line.slice(6).trim();
-            } else if (line.startsWith('data:')) {
-              currentData = line.slice(5).trim();
-              
-              // Parse and yield the event
-              try {
-                const eventData = JSON.parse(currentData) as ProgressEventData;
-                console.log(`[IntelligenceAPI][SSE] event=${currentEvent} status=${eventData.status} progress=${eventData.progress}`);
-                yield eventData;
-                
-                // Break on completion or failure
-                if (eventData.status === TaskStatus.COMPLETED || 
-                    eventData.status === TaskStatus.FAILED) {
-                  break;
-                }
-              } catch (error) {
-                console.warn('Failed to parse SSE event data:', currentData);
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-      
-    } catch (error) {
-      console.error('SSE streaming error:', error);
-      throw error instanceof IntelligenceApiError 
-        ? error 
-        : new IntelligenceApiError(`Streaming failed: ${error}`);
     }
   }
 
@@ -369,20 +290,6 @@ class IntelligenceApiClient {
    */
   async getContentTypes(): Promise<ContentTypeInfo[]> {
     return this.request<ContentTypeInfo[]>('/content-types');
-  }
-
-  /**
-   * Update auth token
-   */
-  setAuthToken(token: string | null): void {
-    this.authToken = token;
-    
-    if (token) {
-      localStorage.setItem('authToken', token);
-    } else {
-      localStorage.removeItem('authToken');
-      sessionStorage.removeItem('authToken');
-    }
   }
 
   // =============================================================================

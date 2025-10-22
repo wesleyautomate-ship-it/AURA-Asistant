@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, Filter, Plus, Search, Tag, Archive, CheckSquare, MoreVertical } from 'lucide-react';
+import { Users, Filter, Plus, Search, Tag, Archive, CheckSquare } from 'lucide-react';
 import { addTag as addTagApi } from '../../../services/contactsApi';
 
 type ContactStatus = 'Active' | 'New' | 'Warm' | 'Cold';
@@ -39,6 +39,33 @@ const statusStyles: Record<ContactStatus, { bg: string; text: string; dot: strin
 
 const FILTERS: Array<ListFilter> = ['All', 'Active', 'New', 'Warm', 'Cold', 'Segments'];
 const SEGMENT_CHIPS: Segment[] = ['Investors', 'Waterfront', 'High Intent', 'Dormant 14d'];
+
+const SEGMENT_MATCHERS: Record<Segment, (contact: Contact) => boolean> = {
+  Investors: (contact) => {
+    const tags = (contact.tags ?? []).map((tag) => tag.toLowerCase())
+    if (tags.some((tag) => tag.includes('investor') || tag.includes('portfolio'))) {
+      return true
+    }
+    return contact.status === 'Warm'
+  },
+  Waterfront: (contact) => {
+    const tags = (contact.tags ?? []).map((tag) => tag.toLowerCase())
+    return tags.some((tag) => tag.includes('waterfront') || tag.includes('marina') || tag.includes('palm'))
+  },
+  'High Intent': (contact) => contact.status === 'Active' || contact.status === 'Warm',
+  'Dormant 14d': (contact) => {
+    if (!contact.lastActivityIso) return false
+    const last = new Date(contact.lastActivityIso)
+    if (Number.isNaN(last.getTime())) return false
+    const diff = Date.now() - last.getTime()
+    return diff >= 14 * 24 * 60 * 60 * 1000
+  },
+}
+
+const inSegment = (contact: Contact, segment: Segment): boolean => {
+  const matcher = SEGMENT_MATCHERS[segment]
+  return matcher ? matcher(contact) : false
+}
 
 export interface ContactsWorkspaceProps {
   contacts?: Contact[];
@@ -106,7 +133,7 @@ export default function ContactsWorkspace({ contacts = DEFAULT_CONTACTS, onAddCo
               </span>
               <div>
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900">Your Contacts</h2>
-                <p className="text-xs sm:text-sm text-gray-500">{filtered.length} shown • {contacts.length} total</p>
+                <p className="text-xs sm:text-sm text-gray-500">{filtered.length} shown â€¢ {contacts.length} total</p>
               </div>
             </div>
             <button
@@ -273,12 +300,14 @@ function ContactCard({
   selectionMode,
   onToggleSelect,
   onLongPressSelect,
+  onAddTag,
 }: {
   contact: Contact;
   selected?: boolean;
   selectionMode?: boolean;
   onToggleSelect?: () => void;
   onLongPressSelect?: () => void;
+  onAddTag?: () => Promise<void> | void;
 }) {
   const style = statusStyles[contact.status];
   const initials = getInitials(contact.name);
@@ -321,12 +350,30 @@ function ContactCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm sm:text-base font-medium text-gray-900 truncate">{contact.name}</p>
-          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] sm:text-xs ${style.bg} ${style.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
-            {contact.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] sm:text-xs ${style.bg} ${style.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} aria-hidden="true" />
+              {contact.status}
+            </span>
+            {onAddTag && (
+              <button
+                type="button"
+                className="hidden sm:inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-amber-600 hover:bg-amber-50 transition-colors"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  const maybePromise = onAddTag()
+                  if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
+                    void (maybePromise as Promise<void>)
+                  }
+                }}
+                aria-label="Add tag"
+              >
+                <Tag className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-0.5">Last activity • {contact.lastActivity ?? '�'}</p>
+        <p className="text-xs text-gray-500 mt-0.5">Last activity • {contact.lastActivity ?? '-'}</p>
       </div>
 
       {!selectionMode && (

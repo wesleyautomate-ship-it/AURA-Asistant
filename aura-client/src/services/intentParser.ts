@@ -1,12 +1,15 @@
 // Intent Detection System for Aura Command Center
 // Analyzes user prompts and determines the appropriate action type
 
-export type IntentType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'PITCH_DECK' | 'GENERIC';
+export type IntentType = 'CMA' | 'MARKET_REPORT' | 'SOCIAL_POST' | 'PITCH_DECK' | 'BROCHURE' | 'GENERIC';
 
 export interface Intent {
   type: IntentType;
   location?: string;
   topic?: string;
+  building?: string;
+  beds?: number;
+  unit?: string;
   confidence: number;
 }
 
@@ -16,6 +19,7 @@ const keywords = {
   MARKET_REPORT: ['report', 'trend', 'analysis', 'market data', 'statistics', 'insights', 'market overview', 'sales data'],
   SOCIAL_POST: ['instagram', 'social', 'post', 'facebook', 'listing', 'marketing content', 'social media', 'tweet', 'linkedin'],
   PITCH_DECK: ['pitch', 'deck', 'presentation', 'investor', 'investment', 'slides', 'pitch deck'],
+  BROCHURE: ['brochure', 'flyer', 'listing brochure', 'marketing brochure', 'property brochure', 'create brochure'],
 };
 
 // Location extraction patterns
@@ -42,6 +46,57 @@ function extractLocation(prompt: string): string {
   if (prompt.toLowerCase().includes('business bay')) return 'Business Bay';
   
   return 'Dubai'; // Fallback
+}
+
+/**
+ * Extract building name from prompt
+ */
+function extractBuilding(prompt: string): string | undefined {
+  // Common Dubai buildings
+  const buildings = [
+    'Orla Residences', 'Six Senses', 'Address Downtown', 'Burj Khalifa',
+    'Emirates Hills', 'Dubai Hills', 'City Walk', 'Business Bay',
+    'Marina Gate', 'JBR', 'Palm Jumeirah'
+  ];
+  
+  const lower = prompt.toLowerCase();
+  for (const building of buildings) {
+    if (lower.includes(building.toLowerCase())) {
+      return building;
+    }
+  }
+  
+  // Try to extract building name patterns like "at [Building Name]"
+  const buildingMatch = prompt.match(/(?:at|in)\s+([A-Z][A-Za-z\s]+?)(?:\s+on|\s+with|\s*$|[,.])/i);
+  if (buildingMatch && buildingMatch[1]) {
+    return buildingMatch[1].trim();
+  }
+  
+  return undefined;
+}
+
+/**
+ * Extract number of bedrooms from prompt
+ */
+function extractBeds(prompt: string): number | undefined {
+  // Match patterns like "2BR", "3-bedroom", "2 bedroom", "3 bed"
+  const bedMatch = prompt.match(/(\d+)\s*(?:br|bed|bedroom)/i);
+  if (bedMatch && bedMatch[1]) {
+    return parseInt(bedMatch[1], 10);
+  }
+  return undefined;
+}
+
+/**
+ * Extract unit information from prompt
+ */
+function extractUnit(prompt: string): string | undefined {
+  // Match patterns like "Unit 1803", "unit 2A"
+  const unitMatch = prompt.match(/unit\s+([A-Za-z0-9]+)/i);
+  if (unitMatch && unitMatch[1]) {
+    return unitMatch[1];
+  }
+  return undefined;
 }
 
 /**
@@ -82,6 +137,7 @@ export function detectIntent(prompt: string): Intent {
   const reportConfidence = calculateConfidence(prompt, keywords.MARKET_REPORT);
   const socialConfidence = calculateConfidence(prompt, keywords.SOCIAL_POST);
   const pitchDeckConfidence = calculateConfidence(prompt, keywords.PITCH_DECK);
+  const brochureConfidence = calculateConfidence(prompt, keywords.BROCHURE);
   
   // Find highest confidence intent (minimum 0.6 threshold)
   const confidences = [
@@ -89,6 +145,7 @@ export function detectIntent(prompt: string): Intent {
     { type: 'MARKET_REPORT' as const, confidence: reportConfidence },
     { type: 'SOCIAL_POST' as const, confidence: socialConfidence },
     { type: 'PITCH_DECK' as const, confidence: pitchDeckConfidence },
+    { type: 'BROCHURE' as const, confidence: brochureConfidence },
   ];
   
   const bestMatch = confidences.reduce((prev, curr) => 
@@ -134,6 +191,15 @@ export function detectIntent(prompt: string): Intent {
         confidence: bestMatch.confidence,
       };
     
+    case 'BROCHURE':
+      return {
+        type: 'BROCHURE',
+        building: extractBuilding(prompt),
+        beds: extractBeds(prompt),
+        unit: extractUnit(prompt),
+        confidence: bestMatch.confidence,
+      };
+    
     default:
       return { type: 'GENERIC', confidence: 0.5 };
   }
@@ -152,6 +218,10 @@ export function formatIntentDescription(intent: Intent): string {
       return `Social Media: ${intent.topic}`;
     case 'PITCH_DECK':
       return `Investor Pitch Deck for ${intent.location}`;
+    case 'BROCHURE':
+      const building = intent.building || 'Property';
+      const beds = intent.beds ? `${intent.beds}BR ` : '';
+      return `Property Brochure: ${beds}${building}`;
     case 'GENERIC':
       return 'AI Assistant';
     default:

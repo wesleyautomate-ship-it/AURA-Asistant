@@ -12,34 +12,129 @@ from sqlalchemy import (
     ForeignKey,
     Table,
     JSON,
+    Float,
+    Numeric,
+    Enum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
+import json
 import uuid
 
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-import os
-# Import Brokerage model to resolve relationship, but allow minimal test mode to avoid deep dependencies
-if os.getenv("AURA_TEST_MINIMAL_MODE") == "1":
-    class Brokerage(Base):
-        __tablename__ = "brokerages"
-        id = Column(Integer, primary_key=True, index=True)
-        name = Column(String(255), nullable=False, index=True)
-        users = relationship("User", back_populates="brokerage")
-else:
-    try:
-        from app.domain.listings.brokerage_models import Brokerage  # noqa: F401
-    except ImportError:
-        # If Brokerage model is not available, define a placeholder for type checking
-        class Brokerage(Base):
-            __tablename__ = "brokerages"
-            id = Column(Integer, primary_key=True, index=True)
-            name = Column(String(255), nullable=False, index=True)
-            users = relationship("User", back_populates="brokerage")
+
+class Brokerage(Base):
+    """Core brokerage entity shared across the platform."""
+
+    __tablename__ = "brokerages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    license_number = Column(String(100), unique=True, nullable=True, index=True)
+    address = Column(Text, nullable=True)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    website = Column(String(255), nullable=True)
+    logo_url = Column(String(500), nullable=True)
+    branding_config = Column(Text, default="{}")
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Primary relationships
+    users = relationship(
+        "User", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+
+    # Extended relationships (kept for downstream domain modules)
+    team_performance = relationship(
+        "TeamPerformance", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    knowledge_base = relationship(
+        "KnowledgeBase", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    brand_assets = relationship(
+        "BrandAsset", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    ai_brand_assets = relationship(
+        "AIBrandAsset", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    workflow_automation = relationship(
+        "WorkflowAutomation", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    client_nurturing = relationship(
+        "ClientNurturing", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    compliance_rules = relationship(
+        "ComplianceRule", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    agent_consistency_metrics = relationship(
+        "AgentConsistencyMetric", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    lead_retention_analytics = relationship(
+        "LeadRetentionAnalytic", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    workflow_efficiency_metrics = relationship(
+        "WorkflowEfficiencyMetric", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    predictive_models = relationship(
+        "PredictivePerformanceModel",
+        back_populates="brokerage",
+        cascade="all, delete-orphan",
+    )
+    benchmarking_data = relationship(
+        "BenchmarkingData", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    activity_analytics = relationship(
+        "UserActivityAnalytic", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    ai_requests = relationship(
+        "AIRequest", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    ai_requests_new = relationship(
+        "AIRequestNew", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    task_automations = relationship(
+        "TaskAutomation", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    rera_compliance_data = relationship(
+        "RERAComplianceData", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    retention_analytics = relationship(
+        "RetentionAnalytic", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    voice_requests = relationship(
+        "VoiceRequest", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+    nurturing_sequences = relationship(
+        "SmartNurturingSequence", back_populates="brokerage", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<Brokerage id={self.id} name='{self.name}'>"
+
+    @property
+    def branding_config_dict(self):
+        """Return branding configuration as a dictionary."""
+        try:
+            if not self.branding_config:
+                return {}
+            return (
+                json.loads(self.branding_config)
+                if isinstance(self.branding_config, str)
+                else dict(self.branding_config)
+            )
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return {}
+
+    @branding_config_dict.setter
+    def branding_config_dict(self, value):
+        """Persist branding configuration from a dictionary."""
+        self.branding_config = json.dumps(value) if value else "{}"
 
 
 # Association tables for many-to-many relationships
@@ -63,7 +158,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     first_name = Column(String(100), nullable=False)
@@ -140,6 +235,17 @@ class User(Base):
     )
     created_nurturing_sequences_ai = relationship(
         "SmartNurturingSequence", back_populates="creator", cascade="all, delete-orphan"
+    )
+    
+    # Enhanced relationships for domain models
+    managed_properties = relationship(
+        "EnhancedProperty", foreign_keys="EnhancedProperty.agent_id", back_populates="agent"
+    )
+    assigned_leads = relationship(
+        "EnhancedLead", foreign_keys="EnhancedLead.assigned_agent_id", back_populates="assigned_agent"
+    )
+    assigned_clients = relationship(
+        "EnhancedClient", foreign_keys="EnhancedClient.assigned_agent_id", back_populates="assigned_agent"
     )
 
     def __repr__(self):
@@ -303,8 +409,12 @@ class BrochureDraft(Base):
     download_url = Column(String(512), nullable=True)
     template_id = Column(String(36), ForeignKey("brochure_templates.id"), nullable=True, index=True)
     contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True, index=True)
+    property_id = Column(String(36), ForeignKey("properties.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    property = relationship("Property")
 
     def __repr__(self):
         return f"<BrochureDraft id={self.id} status={self.status}>"
@@ -317,7 +427,78 @@ class BrochureTemplate(Base):
     name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
     file_path = Column(String(512), nullable=False)
+    preview_url = Column(String(512), nullable=True)
+    fields_schema = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
     def __repr__(self):
         return f"<BrochureTemplate id={self.id} name={self.name}>"
+
+
+# ========================================
+# Property Management Models
+# ========================================
+
+import enum
+
+class PropertyType(enum.Enum):
+    apartment = "apartment"
+    villa = "villa"
+    townhouse = "townhouse"
+    mixed = "mixed"
+
+class PropertyStatus(enum.Enum):
+    draft = "draft"
+    active = "active"
+    archived = "archived"
+
+
+class Property(Base):
+    """Property model for real estate listings"""
+    
+    __tablename__ = "properties"
+    
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    title = Column(String(255), nullable=False, index=True)  # e.g., "2BR at Orla Residences"
+    building = Column(String(255), nullable=False, index=True)  # e.g., "Orla Residences"
+    community = Column(String(255), nullable=True, index=True)  # e.g., "Palm Jumeirah"
+    unit = Column(String(100), nullable=True)  # e.g., "Unit 1803"
+    
+    property_type = Column(Enum(PropertyType), default=PropertyType.apartment, nullable=False)
+    beds = Column(Integer, nullable=True)
+    baths = Column(Float, nullable=True)
+    area_sqft = Column(Float, nullable=True)
+    price_aed = Column(Integer, nullable=True)  # Price in AED
+    
+    description = Column(Text, nullable=True)
+    location_lat = Column(Float, nullable=True)
+    location_lng = Column(Float, nullable=True)
+    
+    status = Column(Enum(PropertyStatus), default=PropertyStatus.draft, nullable=False, index=True)
+    
+    # Relationships
+    photos = relationship("PropertyPhoto", back_populates="property", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Property id={self.id} title='{self.title}' status={self.status}>"
+
+
+class PropertyPhoto(Base):
+    """Property photo model"""
+    
+    __tablename__ = "property_photos"
+    
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    property_id = Column(String(36), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    url = Column(String(512), nullable=False)  # public URL or local path served by backend
+    sort_order = Column(Integer, default=0, nullable=False)
+    
+    # Relationships
+    property = relationship("Property", back_populates="photos")
+    
+    def __repr__(self):
+        return f"<PropertyPhoto id={self.id} property_id={self.property_id} sort_order={self.sort_order}>"

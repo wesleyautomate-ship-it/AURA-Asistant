@@ -917,7 +917,7 @@ export const useCommandStore = create<CommandStore>()(persist(
     }));
     
     // Send to backend (implementation would depend on API)
-    // fetch('/api/v1/command-center/session/heartbeat', {
+    // api.get('/command-center/session/heartbeat', {
     //   method: 'POST',
     //   body: JSON.stringify(heartbeatData)
     // }).catch(err => console.warn('[Session] Heartbeat failed:', err));

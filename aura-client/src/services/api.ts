@@ -1,22 +1,22 @@
-// API Service for Aura Backend Integration
+// API Service utilities for transcription and streaming
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import api from './http'
+import { getAuthToken } from '../store/authStore'
+
+const API_BASE_URL = api.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 export interface TranscriptionResponse {
-  transcript: string;
-  confidence?: number;
-  language?: string;
+  transcript: string
+  confidence?: number
+  language?: string
 }
 
 export interface AIStreamResponse {
-  content: string;
-  done: boolean;
-  error?: string;
+  content: string
+  done: boolean
+  error?: string
 }
 
-/**
- * Generate mock transcription for development/testing
- */
 function generateMockTranscription(): string {
   const mockTranscriptions = [
     'Generate a comprehensive CMA for Downtown Dubai with pricing trends and market analysis.',
@@ -27,219 +27,161 @@ function generateMockTranscription(): string {
     'Create a buyer presentation for first-time homebuyers in Dubai.',
     'Analyze market trends for commercial properties in Business Bay.',
     'Generate an investment analysis report for Dubai real estate.',
-  ];
-  return mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
+  ]
+  return mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)]
 }
 
-/**
- * Transcribe audio blob to text using backend API or mock data
- */
 export async function transcribeAudio(audioBlob: Blob): Promise<string> {
-  // Check AURA_MOCK_MODE first (new unified system)
-  const auraMockMode = import.meta.env.VITE_AURA_MOCK_MODE === 'true';
-  const legacyMockMode = import.meta.env.VITE_USE_REAL_TRANSCRIPTION !== 'true';
-  const useMock = auraMockMode || legacyMockMode;
-  
-  // Mock transcription mode (faster, no API required)
+  const auraMockMode = import.meta.env.VITE_AURA_MOCK_MODE === 'true'
+  const legacyMockMode = import.meta.env.VITE_USE_REAL_TRANSCRIPTION !== 'true'
+  const useMock = auraMockMode || legacyMockMode
+
   if (useMock) {
-    console.log('[Transcription] Using AURA mock mode');
-    
-    // Use new mock system if available
+    console.log('[Transcription] Using mock mode')
     if (auraMockMode) {
       try {
-        const { simulateMockTranscription } = await import('../mocks/transcriptionPrompts');
-        return await simulateMockTranscription();
+        const { simulateMockTranscription } = await import('../mocks/transcriptionPrompts')
+        return await simulateMockTranscription()
       } catch (error) {
-        console.warn('[Transcription] New mock system unavailable, using legacy:', error);
+        console.warn('[Transcription] Mock transcription import failed, using fallback:', error)
       }
     }
-    
-    // Fallback to legacy mock system
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return generateMockTranscription();
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    return generateMockTranscription()
   }
-  
-  // Real transcription mode (requires backend API)
+
   try {
-    console.log('[Transcription] Using real API mode');
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'recording.webm');
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/voice/transcribe`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Transcription failed: ${response.statusText}`);
-    }
-
-    const data: TranscriptionResponse = await response.json();
-    return data.transcript;
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'recording.webm')
+    const { data } = await api.post<TranscriptionResponse>('/voice/transcribe', formData)
+    return data.transcript
   } catch (error) {
-    console.error('[Transcription] API error:', error);
-    console.log('[Transcription] Falling back to mock mode');
-    // Fallback to mock on API failure
-    return generateMockTranscription();
+    console.error('[Transcription] API error:', error)
+    return generateMockTranscription()
   }
 }
 
-/**
- * Stream AI response using Server-Sent Events (SSE)
- */
 export function streamAIResponse(
   prompt: string,
   onChunk: (text: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void
 ): () => void {
-  try {
-    const encodedPrompt = encodeURIComponent(prompt);
-    const eventSource = new EventSource(
-      `${API_BASE_URL}/api/v1/ai_request/stream?prompt=${encodedPrompt}`
-    );
+  const token = getAuthToken()
 
-    let isClosed = false;
-    let safetyTimeoutId: number | null = null;
+  if (token) {
+    let cancelled = false
+    let cleanup: (() => void) | null = null
+
+    ;(async () => {
+      try {
+        const fn = await streamAIResponseFetch(prompt, onChunk, onComplete, onError, token)
+        if (cancelled) {
+          fn()
+        } else {
+          cleanup = fn
+        }
+      } catch (error) {
+        onError(error as Error)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      if (cleanup) cleanup()
+    }
+  }
+
+  try {
+    const encodedPrompt = encodeURIComponent(prompt)
+    const eventSource = new EventSource(`${API_BASE_URL}/ai_request/stream?prompt=${encodedPrompt}`)
+    let isClosed = false
+    let safetyTimeoutId: number | null = null
 
     const cleanup = () => {
-      if (isClosed) return;
-      isClosed = true;
-      
+      if (isClosed) return
+      isClosed = true
       if (safetyTimeoutId !== null) {
-        clearTimeout(safetyTimeoutId);
-        safetyTimeoutId = null;
+        clearTimeout(safetyTimeoutId)
+        safetyTimeoutId = null
       }
-      
-      eventSource.close();
-      console.log('[SSE] Connection closed and cleaned up');
-    };
+      eventSource.close()
+      console.log('[SSE] Connection closed and cleaned up')
+    }
 
     eventSource.onmessage = (event) => {
       try {
-        const data: AIStreamResponse = JSON.parse(event.data);
-        
+        const data: AIStreamResponse = JSON.parse(event.data)
         if (data.error) {
-          console.error('[SSE] Stream error:', data.error);
-          onError(new Error(data.error));
-          cleanup();
-          return;
+          onError(new Error(data.error))
+          cleanup()
+          return
         }
-
-        if (data.content) {
-          onChunk(data.content);
-        }
-
+        if (data.content) onChunk(data.content)
         if (data.done) {
-          console.log('[SSE] Stream completed successfully');
-          onComplete();
-          cleanup();
+          onComplete()
+          cleanup()
         }
       } catch (err) {
-        console.error('[SSE] Failed to parse stream data:', err);
-        onError(new Error('Failed to parse stream data'));
-        cleanup();
+        onError(new Error('Failed to parse stream data'))
+        cleanup()
       }
-    };
+    }
 
     eventSource.onerror = (error) => {
-      console.error('[SSE] Connection error:', error);
-      onError(new Error('Stream connection failed'));
-      cleanup();
-    };
+      console.error('[SSE] Connection error:', error)
+      onError(new Error('Stream connection failed'))
+      cleanup()
+    }
 
-    // Safety timeout: auto-close after 30 seconds to prevent hanging
     safetyTimeoutId = window.setTimeout(() => {
-      console.warn('[SSE] Safety timeout triggered - closing connection');
-      cleanup();
-      onError(new Error('Stream timeout - no response received'));
-    }, 30000);
+      console.warn('[SSE] Safety timeout triggered - closing connection')
+      cleanup()
+      onError(new Error('Stream timeout - no response received'))
+    }, 30000)
 
-    // Return cleanup function
-    return cleanup;
+    return cleanup
   } catch (error) {
-    console.error('[SSE] Failed to initialize stream:', error);
-    onError(error as Error);
-    return () => {};
+    onError(error as Error)
+    return () => {}
   }
 }
 
-/**
- * Fallback: Use fetch with streaming for browsers that don't support SSE well
- */
 export async function streamAIResponseFetch(
   prompt: string,
   onChunk: (text: string) => void,
   onComplete: () => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  token?: string
 ): Promise<() => void> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/ai_request/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`AI request failed: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-
-    if (!reader) {
-      throw new Error('No response body');
-    }
-
-    let aborted = false;
-
-    const read = async () => {
-      try {
-        while (!aborted) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            onComplete();
-            break;
-          }
-
-          const chunk = decoder.decode(value, { stream: true });
-          onChunk(chunk);
-        }
-      } catch (error) {
-        if (!aborted) {
-          onError(error as Error);
-        }
+    const { data } = await api.post<string>(
+      '/ai_request/stream',
+      { prompt },
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        responseType: 'text',
+        transformResponse: [(value) => value],
       }
-    };
+    )
 
-    read();
-
-    // Return cleanup function
-    return () => {
-      aborted = true;
-      reader.cancel();
-    };
+    if (typeof data === 'string') {
+      onChunk(data)
+    }
+    onComplete()
   } catch (error) {
-    onError(error as Error);
-    return () => {};
+    onError(error as Error)
   }
+
+  return () => {}
 }
 
-/**
- * Check if backend API is available
- */
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    });
-    return response.ok;
+    await api.get('/health', { timeout: 5000 })
+    return true
   } catch (error) {
-    console.warn('Backend health check failed:', error);
-    return false;
+    console.warn('Backend health check failed:', error)
+    return false
   }
 }
