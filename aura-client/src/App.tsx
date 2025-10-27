@@ -31,7 +31,7 @@ export default function App() {
         </>
       )}
 
-      {import.meta.env.DEV && <AuthDebugPanel />}
+      {import.meta.env.DEV && import.meta.env.VITE_SHOW_AUTH_DEBUG === 'true' && <AuthDebugPanel />}
     </div>
   )
 }

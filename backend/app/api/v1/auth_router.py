@@ -99,8 +99,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             db.execute(
                 text(
                     """
-                INSERT INTO audit_logs (user_id, event_type, event_data, success, error_message, created_at)
-                VALUES (:user_id, 'login_failed', :event_data, false, 'Invalid password', CURRENT_TIMESTAMP)
+                INSERT INTO audit_logs (user_id, event_type, event_data, success, error_message, occurred_at, created_at)
+                VALUES (:user_id, 'login_failed', :event_data, false, 'Invalid password', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """
                 ),
                 {
@@ -150,8 +150,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         db.execute(
             text(
                 """
-            INSERT INTO audit_logs (user_id, event_type, event_data, success, created_at)
-            VALUES (:user_id, 'login_success', :event_data, true, CURRENT_TIMESTAMP)
+            INSERT INTO audit_logs (user_id, event_type, event_data, success, occurred_at, created_at)
+            VALUES (:user_id, 'login_success', :event_data, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
             ),
             {
@@ -300,8 +300,8 @@ async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
         db.execute(
             text(
                 """
-            INSERT INTO audit_logs (user_id, event_type, event_data, success, created_at)
-            VALUES (:user_id, 'token_refresh', :event_data, true, CURRENT_TIMESTAMP)
+            INSERT INTO audit_logs (user_id, event_type, event_data, success, occurred_at, created_at)
+            VALUES (:user_id, 'token_refresh', :event_data, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
             ),
             {

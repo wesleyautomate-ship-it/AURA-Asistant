@@ -582,6 +582,27 @@ async def version():
 
 logger.info("Status endpoints ready")
 
+# Dev-only helpers ---------------------------------------------------------
+_DEV_ENV_NAMES = {"development", "dev", "local"}
+_current_env = str(
+    getattr(settings, "ENV", getattr(settings, "environment", "development"))
+).lower()
+
+if _current_env in _DEV_ENV_NAMES:
+
+    @app.get("/_dev/whoami", include_in_schema=False)
+    async def dev_whoami(current_user: Any = Depends(get_current_user)):
+        """Return the active user for quick auth checks."""
+        return {
+            "user": {
+                "id": getattr(current_user, "id", None),
+                "email": getattr(current_user, "email", None),
+                "role": getattr(current_user, "role", None),
+                "is_superuser": getattr(current_user, "is_superuser", False),
+                "is_dev_user": getattr(current_user, "is_dev_user", False),
+            }
+        }
+
 # Helper to register AI-dependent routers with graceful fallback
 def register_ai_router(router, prefix: str, tags: list[str], feature_name: str):
     if not router:

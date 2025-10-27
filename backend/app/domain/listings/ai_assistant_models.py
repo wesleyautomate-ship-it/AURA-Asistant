@@ -21,7 +21,6 @@ from sqlalchemy import (
     ForeignKey,
     DECIMAL,
     JSON,
-    ARRAY,
     Date,
 )
 from sqlalchemy.orm import relationship
@@ -109,8 +108,8 @@ class HumanExpert(Base):
     rating = Column(DECIMAL(3, 2), default=5.00, index=True)  # 1.00-5.00
     completed_tasks = Column(Integer, default=0)
     total_revenue = Column(DECIMAL(10, 2), default=0.00)
-    specializations = Column(ARRAY(String))
-    languages = Column(ARRAY(String), default=["English"])
+    specializations = Column(JSON, default=list)
+    languages = Column(JSON, default=lambda: ["English"])
     timezone = Column(String(50), default="Asia/Dubai")
     working_hours = Column(JSON, default=dict)
     is_active = Column(Boolean, default=True, index=True)

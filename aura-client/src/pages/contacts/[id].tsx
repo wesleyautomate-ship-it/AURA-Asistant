@@ -32,7 +32,7 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
-  const [followUps, setFollowUps] = useState<FollowUpItem[]>([]);
+  const [, setFollowUps] = useState<FollowUpItem[]>([]);
   const [nextFU, setNextFU] = useState<FollowUpItem | null>(null);
 
   // Follow-up compose drawer state

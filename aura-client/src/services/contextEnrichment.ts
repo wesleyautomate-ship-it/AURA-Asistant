@@ -48,6 +48,11 @@ export const WORKFLOW_REQUIREMENTS: WorkflowFieldRequirements = {
       platform: 'instagram',
       category: 'marketing'
     }
+  },
+  BROCHURE: {
+    required: [],
+    optional: ['building', 'beds', 'unit', 'community'],
+    fallbacks: {}
   }
 };
 

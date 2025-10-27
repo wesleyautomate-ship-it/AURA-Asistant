@@ -7,9 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  Brain,
   CheckCircle,
-  AlertTriangle,
   Zap,
   Printer,
   Download,
@@ -25,10 +23,6 @@ import BottomDock from '../components/ui/BottomDock';
 import RefineModal from '../components/RefineModal';
 
 const API_BASE_URL = (api.defaults.baseURL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
-
-interface ContentViewerParams {
-  contentId: string;
-}
 
 export default function ContentViewer() {
   const { contentId } = useParams<{ contentId: string }>();
@@ -54,6 +48,49 @@ export default function ContentViewer() {
   const brochurePdfUrl = isBrochure && content
     ? `${API_BASE_URL}/intelligence/content/${content.contentId}?format=pdf`
     : undefined;
+
+  const getStatusMeta = (item: IntelligenceContent | null) => {
+    const rawStatus = item?.status ?? (item as any)?.request?.status ?? 'draft'
+    const status = String(rawStatus).toLowerCase()
+
+    if (['completed', 'ready', 'approved', 'delivered'].includes(status)) {
+      return {
+        color: 'bg-emerald-100 text-emerald-700',
+        icon: CheckCircle,
+        label: 'Completed',
+      }
+    }
+
+    if (['failed', 'error', 'rejected'].includes(status)) {
+      return {
+        color: 'bg-red-100 text-red-700',
+        icon: AlertCircle,
+        label: 'Action required',
+      }
+    }
+
+    if (['processing', 'running', 'in_progress', 'queued', 'pending'].includes(status)) {
+      return {
+        color: 'bg-amber-100 text-amber-700',
+        icon: Zap,
+        label: 'In progress',
+      }
+    }
+
+    return {
+      color: 'bg-slate-100 text-slate-700',
+      icon: AlertCircle,
+      label: status ? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Draft',
+    }
+  }
+
+  const getStatusColor = (item: IntelligenceContent | null) => getStatusMeta(item).color
+  const getStatusIcon = (item: IntelligenceContent | null) => {
+    const meta = getStatusMeta(item)
+    const Icon = meta.icon
+    return <Icon className="w-4 h-4" />
+  }
+  const getStatusLabel = (item: IntelligenceContent | null) => getStatusMeta(item).label
 
   useEffect(() => {
     if (!contentId) return;

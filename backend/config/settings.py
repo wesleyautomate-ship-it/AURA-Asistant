@@ -10,6 +10,15 @@ from env_loader import load_env
 # Load environment variables from centralized loader
 load_env()
 
+def _get_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+ENV = os.getenv("ENV") or os.getenv("ENVIRONMENT", "development")
+ENVIRONMENT = os.getenv("ENVIRONMENT", ENV)
+
 # Base directory
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -79,6 +88,9 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE = Path("logs/app.log")
 LOG_FILE.parent.mkdir(exist_ok=True)
 
+# Authentication bypass (dev only)
+DEV_AUTH_BYPASS = _get_bool("DEV_AUTH_BYPASS", False)
+
 # Performance Configuration
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "4"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "50"))
@@ -125,6 +137,11 @@ class Settings:
         self.bcrypt_rounds = BCRYPT_ROUNDS
         self.rate_limit_requests_per_minute = RATE_LIMIT_REQUESTS_PER_MINUTE
         self.rate_limit_login_attempts = RATE_LIMIT_LOGIN_ATTEMPTS
+        self.dev_auth_bypass = DEV_AUTH_BYPASS
+        self.DEV_AUTH_BYPASS = DEV_AUTH_BYPASS
+        self.environment = ENVIRONMENT
+        self.ENVIRONMENT = ENVIRONMENT
+        self.ENV = ENV
 
 def get_settings() -> Settings:
     """Get settings instance for dependency injection"""
@@ -157,5 +174,6 @@ __all__ = [
     'MAX_WORKERS', 'BATCH_SIZE', 'SECRET_KEY', 'IS_PRODUCTION',
     'JWT_ALGORITHM', 'ALGORITHM', 'JWT_REFRESH_TOKEN_EXPIRE_DAYS', 'BCRYPT_ROUNDS',
     'RATE_LIMIT_REQUESTS_PER_MINUTE', 'RATE_LIMIT_LOGIN_ATTEMPTS',
+    'DEV_AUTH_BYPASS', 'ENVIRONMENT', 'ENV',
     'validate_settings', 'Settings', 'get_settings'
 ]

@@ -18,6 +18,10 @@ def _get_bool(name: str, default: bool = False) -> bool:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
+# Environment naming
+ENV = os.getenv("ENV") or os.getenv("ENVIRONMENT", "development")
+ENVIRONMENT = os.getenv("ENVIRONMENT", ENV)
+
 # Base directory
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -70,6 +74,7 @@ else:
 
 # Dev auth toggle (off by default)
 DEV_AUTH_ALLOW = _get_bool("DEV_AUTH_ALLOW", False)
+DEV_AUTH_BYPASS = _get_bool("DEV_AUTH_BYPASS", False)
 
 # Google AI Configuration
 # Support both GEMINI_API_KEY and GOOGLE_API_KEY for backward compatibility
@@ -203,6 +208,11 @@ class Settings:
         self.CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS
         self.dev_auth_allow = DEV_AUTH_ALLOW
         self.DEV_AUTH_ALLOW = DEV_AUTH_ALLOW
+        self.dev_auth_bypass = DEV_AUTH_BYPASS
+        self.DEV_AUTH_BYPASS = DEV_AUTH_BYPASS
+        self.environment = ENVIRONMENT
+        self.ENVIRONMENT = ENVIRONMENT
+        self.ENV = ENV
         # Property-Brochure Feature Flags
         self.pdf_feature_enabled = PDF_FEATURE_ENABLED
         self.backend_enabled = BACKEND_ENABLED
@@ -269,7 +279,10 @@ __all__ = [
     "RATE_LIMIT_LOGIN_ATTEMPTS",
     "CORS_ALLOWED_ORIGINS",
     "DEV_AUTH_ALLOW",
+    "DEV_AUTH_BYPASS",
     "OBJECT_STORE_PATH",
+    "ENVIRONMENT",
+    "ENV",
     "ENABLE_PDF_WEASYPRINT",
     "ENABLE_VECTOR_CHROMA",
     "PDF_FEATURE_ENABLED",

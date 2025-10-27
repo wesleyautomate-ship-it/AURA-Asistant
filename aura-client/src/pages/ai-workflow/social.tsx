@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Megaphone } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 export default function AIWorkflowSocial() {
   const navigate = useNavigate();

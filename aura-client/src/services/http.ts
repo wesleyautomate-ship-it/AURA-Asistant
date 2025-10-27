@@ -42,6 +42,22 @@ export const clearTokens = () => {
 
 const redirectToLogin = () => {
   if (typeof window === 'undefined') return
+  if (import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true') {
+    console.warn('Dev auth bypass active \u2014 skipping login redirect')
+    const devWhoamiUrl = (() => {
+      try {
+        const url = new URL(baseURL)
+        url.pathname = '/_dev/whoami'
+        return url.toString()
+      } catch {
+        return '/_dev/whoami'
+      }
+    })()
+    void fetch(devWhoamiUrl, { credentials: 'include' }).catch((err) => {
+      console.debug('Dev auth bypass probe failed', err)
+    })
+    return
+  }
   if (window.location.pathname !== '/login') {
     window.location.replace('/login')
   }

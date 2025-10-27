@@ -56,7 +56,7 @@ export const ExportToolbar = ({
       setExportStatus('PDF downloaded');
       setTimeout(() => setExportStatus(''), 3000);
     } else {
-      setExportStatus(result.error ? f'Export failed: {result.error}' : 'Export failed');
+      setExportStatus(result.error ? `Export failed: ${result.error}` : 'Export failed');
       setTimeout(() => setExportStatus(''), 5000);
     }
 
@@ -80,7 +80,7 @@ export const ExportToolbar = ({
       setExportStatus('Share link generated');
       setTimeout(() => setExportStatus(''), 3000);
     } else {
-      setExportStatus(result.error ? f'Failed to generate link: {result.error}' : 'Failed to generate link');
+      setExportStatus(result.error ? `Failed to generate link: ${result.error}` : 'Failed to generate link');
       setTimeout(() => setExportStatus(''), 5000);
     }
 
@@ -148,7 +148,7 @@ export const ExportToolbar = ({
         )}
 
         {exportStatus && !isExporting && (
-          <div className={`status-indicator ${exportStatus.startsWith('✓') 'success' : 'error'}`}>
+          <div className={`status-indicator ${/failed|error/i.test(exportStatus) ? 'error' : 'success'}`}>
             <span>{exportStatus}</span>
           </div>
         )}
@@ -165,7 +165,7 @@ export const ExportToolbar = ({
 
         {status && status.export_count > 0 && (
           <div className="export-badge">
-            <span>{status.export_count} {status.export_count === 1 'export' : 'exports'}</span>
+            <span>{status.export_count} {status.export_count === 1 ? 'export' : 'exports'}</span>
             {status.formats_available.length > 0 && (
               <span className="formats">({status.formats_available.join(', ')})</span>
             )}
@@ -184,7 +184,7 @@ export const ExportToolbar = ({
                 className="close-btn"
                 aria-label="Close"
               >
-                ×
+                Close
               </button>
             </div>
 

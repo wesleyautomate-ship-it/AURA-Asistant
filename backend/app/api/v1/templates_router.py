@@ -36,6 +36,7 @@ def _serialize_template(template: BrochureTemplate) -> Dict[str, Any]:
 
 
 @router.get("/")
+@router.get("")
 def list_templates(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     templates = (
         db.query(BrochureTemplate)
@@ -57,4 +58,3 @@ def get_template(
     if template is None:
         raise HTTPException(status_code=404, detail="Template not found")
     return _serialize_template(template)
-

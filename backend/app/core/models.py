@@ -2,6 +2,8 @@
 Authentication models for Dubai Real Estate RAG System
 """
 
+import importlib
+import logging
 from sqlalchemy import (
     Column,
     Integer,
@@ -25,6 +27,7 @@ import uuid
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 
 class Brokerage(Base):
@@ -137,6 +140,7 @@ class Brokerage(Base):
         self.branding_config = json.dumps(value) if value else "{}"
 
 
+
 # Association tables for many-to-many relationships
 role_permissions = Table(
     "role_permissions",
@@ -210,6 +214,12 @@ class User(Base):
     developer_settings = relationship(
         "DeveloperPanelSetting", back_populates="user", cascade="all, delete-orphan"
     )
+    uploaded_documents = relationship(
+        "DocumentManagement", back_populates="uploader", cascade="all, delete-orphan"
+    )
+    transactions = relationship(
+        "Transaction", back_populates="agent", cascade="all, delete-orphan"
+    )
 
     # AI Assistant relationships
     ai_requests = relationship(
@@ -233,6 +243,8 @@ class User(Base):
     task_automations = relationship(
         "TaskAutomation", back_populates="agent", cascade="all, delete-orphan"
     )
+    property_viewings = relationship("PropertyViewing", back_populates="agent", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="agent", cascade="all, delete-orphan")
     created_nurturing_sequences_ai = relationship(
         "SmartNurturingSequence", back_populates="creator", cascade="all, delete-orphan"
     )
@@ -260,6 +272,24 @@ class User(Base):
         if self.locked_until and self.locked_until > datetime.utcnow():
             return True
         return False
+
+
+class Contact(Base):
+    """Lightweight contacts table for brochure drafts and legacy flows."""
+
+    __tablename__ = "contacts"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    avatar_url = Column(String(512), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:
+        return f"<Contact(id={self.id}, name='{self.name}')>"
 
 
 class UserSession(Base):
@@ -346,7 +376,12 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    contact_id = Column(Integer, ForeignKey("clients.id"), nullable=True, index=True)
+    contact_id = Column(
+        Integer,
+        ForeignKey("contacts.id"),
+        nullable=True,
+        index=True,
+    )
     event_type = Column(
         String(100), nullable=False
     )  # login, logout, password_change, etc.
@@ -502,3 +537,33 @@ class PropertyPhoto(Base):
     
     def __repr__(self):
         return f"<PropertyPhoto id={self.id} property_id={self.property_id} sort_order={self.sort_order}>"
+
+
+def _register_domain_models():
+    """
+    Best-effort import of domain model modules so relationship targets resolve
+    during metadata creation (needed for dev/test SQLite databases).
+    """
+    def _register_module_models(module):
+        registry = Base.registry._class_registry
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name)
+            if isinstance(attr, type) and hasattr(attr, "__mro__"):
+                if Base in getattr(attr, "__mro__", ()):
+                    registry[attr_name] = attr
+
+    for module_path in (
+        "app.domain.listings.brokerage_models",
+        "app.domain.listings.ai_request_models",
+        "app.domain.listings.ai_assistant_models",
+        "app.domain.listings.phase3_advanced_models",
+        "app.domain.listings.enhanced_real_estate_models",
+    ):
+        try:
+            module = importlib.import_module(module_path)
+            _register_module_models(module)
+        except Exception as exc:  # pragma: no cover - optional dependency
+            logger.debug("Skipping domain model registration for %s: %s", module_path, exc)
+
+
+_register_domain_models()

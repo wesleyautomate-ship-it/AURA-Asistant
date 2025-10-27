@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, BarChart3 } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 export default function AIWorkflowCMA() {
   const navigate = useNavigate();

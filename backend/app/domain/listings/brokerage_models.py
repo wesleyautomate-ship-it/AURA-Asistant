@@ -18,6 +18,7 @@ from sqlalchemy import (
     DECIMAL,
     Date,
     ARRAY,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -88,7 +89,7 @@ class KnowledgeBase(Base):
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
     category = Column(String(100), nullable=True, index=True)
-    tags = Column(ARRAY(String), nullable=True)
+    tags = Column(JSON, nullable=True, default=list)
     is_active = Column(Boolean, default=True, index=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())

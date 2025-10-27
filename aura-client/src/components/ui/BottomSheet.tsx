@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import Portal from './Portal';
@@ -7,7 +7,7 @@ export interface BottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   initialHeight?: 'content' | 'half' | 'full';
 }
 
@@ -23,6 +23,8 @@ const focusableSelectors = [
 export default function BottomSheet({ isOpen, onClose, title, children, initialHeight = 'content' }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const startScrollLockRef = useRef<string | null>(null);
+  // Baseline Y offset for sheet; do not redeclare.
+  const INITIAL_Y = initialHeight === 'full' ? '0%' : '100%';
 
   // Body scroll lock
   useEffect(() => {
@@ -79,8 +81,6 @@ export default function BottomSheet({ isOpen, onClose, title, children, initialH
     }
   }, [onClose]);
 
-  const initialY = initialHeight === 'full' ? '0%' : '100%';
-
   return (
     <Portal>
       <AnimatePresence>{isOpen && (
@@ -103,7 +103,7 @@ export default function BottomSheet({ isOpen, onClose, title, children, initialH
             role="dialog"
             aria-modal="true"
             aria-label={title || 'Bottom Sheet'}
-            initial={{ y: '100%' }}
+            initial={{ y: INITIAL_Y }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}

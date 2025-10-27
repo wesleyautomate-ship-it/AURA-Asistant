@@ -3,10 +3,11 @@ import { persist } from 'zustand/middleware'
 import { login as loginApi, logout as logoutApi } from '../services/authApi'
 import api, { storeTokens, clearTokens } from '../services/http'
 
-const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true'
+const AUTH_MODE_ENV = ((import.meta.env.VITE_AUTH_MODE as string) || 'api').toLowerCase()
+const DEV_AUTH_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
+const FORCE_DEV_AUTH = AUTH_MODE_ENV === 'mock' || DEV_AUTH_BYPASS
+const USE_AUTH_API = !FORCE_DEV_AUTH && import.meta.env.VITE_USE_REAL_API === 'true'
 const DEV_TOKEN = 'dev-token-12345-aura-ai'
-
-const getStorage = () => (typeof window !== 'undefined' ? window.localStorage : null)
 
 export interface User {
   id: string
@@ -83,22 +84,26 @@ const defaultDevUser: User = {
   },
 }
 
-export const useAuthStore = create<AuthState>()(
+type InternalAuthState = AuthState & {
+  _devInitialized?: boolean;
+};
+
+export const useAuthStore = create<InternalAuthState>()(
   persist(
     (set, get) => ({
-      user: USE_REAL_API ? null : defaultDevUser,
-      accessToken: USE_REAL_API ? null : DEV_TOKEN,
-      refreshToken: USE_REAL_API ? null : DEV_TOKEN,
+      user: USE_AUTH_API ? null : defaultDevUser,
+      accessToken: USE_AUTH_API ? null : DEV_TOKEN,
+      refreshToken: USE_AUTH_API ? null : DEV_TOKEN,
       tokenExpiresAt: null,
-      isAuthenticated: !USE_REAL_API,
+      isAuthenticated: !USE_AUTH_API,
       isLoading: false,
       error: null,
-      mode: USE_REAL_API ? 'api' : 'mock',
+      mode: USE_AUTH_API ? 'api' : 'mock',
 
       login: async ({ email, password }: LoginCredentials) => {
         set({ isLoading: true, error: null })
 
-        if (!USE_REAL_API) {
+        if (!USE_AUTH_API) {
           await new Promise((resolve) => setTimeout(resolve, 350))
           persistTokens(DEV_TOKEN, DEV_TOKEN)
           set({
@@ -146,7 +151,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        logoutApi()
+        if (USE_AUTH_API) {
+          logoutApi()
+        }
         set({
           user: null,
           accessToken: null,
@@ -165,7 +172,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async () => {
-        if (!USE_REAL_API) {
+        if (!USE_AUTH_API) {
           return true
         }
 
@@ -236,8 +243,35 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-if (!USE_REAL_API) {
-  persistTokens(DEV_TOKEN, DEV_TOKEN)
+if (!USE_AUTH_API) {
+  const ensureDevState = () => {
+    const state = useAuthStore.getState()
+    if (state._devInitialized) {
+      return
+    }
+    persistTokens(DEV_TOKEN, DEV_TOKEN)
+    useAuthStore.setState({
+      user: defaultDevUser,
+      accessToken: DEV_TOKEN,
+      refreshToken: DEV_TOKEN,
+      tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+      isAuthenticated: true,
+      mode: 'mock',
+      _devInitialized: true,
+      isLoading: false,
+      error: null,
+    })
+  }
+
+  ensureDevState()
+
+  const storeWithPersist = useAuthStore as typeof useAuthStore & {
+    persist?: {
+      onFinish?: (callback: () => void) => void
+    }
+  }
+
+  storeWithPersist.persist?.onFinish?.(ensureDevState)
 }
 
 export const useAuth = () => {

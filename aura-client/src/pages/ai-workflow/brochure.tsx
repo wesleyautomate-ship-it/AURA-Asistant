@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, FileText } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { brochureDraftService, mapTemplateIdToKey } from '../../services/brochureDrafts';
 import { listTemplates, type BrochureTemplateOut } from '../../features/brochure/api/brochure';
 

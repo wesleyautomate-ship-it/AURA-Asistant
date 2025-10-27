@@ -2,6 +2,7 @@
 // Handles backend API calls for specific task types (CMA, Market Reports, Social Posts)
 // Enhanced with context validation and enrichment to prevent 422 errors
 
+import type { AxiosError } from 'axios'
 import { enrichWorkflowPayload, EnrichedPayload } from './contextEnrichment';
 import { Intent } from './intentParser';
 import api from './http';

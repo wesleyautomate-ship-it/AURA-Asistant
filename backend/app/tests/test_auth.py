@@ -29,8 +29,14 @@ app.dependency_overrides[get_db] = override_get_db
 
 @pytest.fixture
 def client():
-    # Create tables
-    Base.metadata.create_all(bind=engine)
+    # Create only the tables required for auth tests to avoid unsupported types in SQLite.
+    required_tables = [
+        Base.metadata.tables["users"],
+        Base.metadata.tables.get("user_sessions"),
+        Base.metadata.tables.get("audit_logs"),
+    ]
+    tables = [table for table in required_tables if table is not None]
+    Base.metadata.create_all(bind=engine, tables=tables)
 
     # Create test data
     db = TestingSessionLocal()
@@ -61,7 +67,7 @@ def client():
         yield c
 
     # Clean up
-    Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine, tables=tables)
 
 
 def test_health_endpoint(client):

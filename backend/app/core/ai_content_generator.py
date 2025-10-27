@@ -10,7 +10,8 @@ import os
 import uuid
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, Iterable, List, Optional
 from datetime import datetime, timedelta
 import google.generativeai as genai
 
@@ -24,6 +25,197 @@ from app.schemas.intelligence import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def format_aed(amount: Any, *, include_symbol: bool = True) -> str:
+    """
+    Format a numeric or string value into an AED currency string.
+
+    Keeps behaviour tolerant of values already containing the AED prefix
+    while normalising output for UI/tests.
+    """
+    symbol = "AED " if include_symbol else ""
+
+    if amount is None:
+        return f"{symbol}0"
+
+    candidate = amount
+    if isinstance(candidate, str):
+        stripped = candidate.strip()
+        if not stripped:
+            return f"{symbol}0"
+        if stripped.upper().startswith("AED"):
+            stripped = stripped[3:].strip()
+        stripped = stripped.replace(",", "")
+        candidate = stripped or "0"
+
+    try:
+        numeric = Decimal(str(candidate))
+    except (InvalidOperation, ValueError, TypeError):
+        return f"{symbol}{candidate}"
+
+    if numeric < 0:
+        numeric = abs(numeric)
+
+    quantized = numeric.quantize(Decimal("1.00"))
+    if quantized == quantized.to_integral():
+        formatted_value = f"{quantized.to_integral():,}"
+    else:
+        formatted_value = f"{quantized:,.2f}"
+
+    return f"{symbol}{formatted_value}"
+
+
+def extract_property_query(user_input: str) -> str:
+    """
+    Pull a property identifier from free-form user input.
+
+    The helper is intentionally forgiving and keeps the original casing so the
+    result can be used in downstream lookups.
+    """
+    if not user_input:
+        return ""
+
+    text = user_input.strip()
+    lowered = text.lower()
+
+    key_phrases = (
+        "brochure for ",
+        "listing for ",
+        "flyer for ",
+        "property for ",
+    )
+
+    for phrase in key_phrases:
+        idx = lowered.find(phrase)
+        if idx != -1:
+            start = idx + len(phrase)
+            return text[start:].strip(" ,.!?:;\"'")
+
+    fallback_markers = ("for ", "about ", "regarding ")
+    for marker in fallback_markers:
+        idx = lowered.find(marker)
+        if idx != -1:
+            start = idx + len(marker)
+            return text[start:].strip(" ,.!?:;\"'")
+
+    return text
+
+
+def _coerce_decimal(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return float(Decimal(str(value)))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _dict_get(source: Any, key: str, default: Any = None) -> Any:
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
+
+
+def _as_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
+
+
+def serialize_property_for_brochure(property_obj: Any) -> Dict[str, Any]:
+    """
+    Convert a property ORM object (or dict) into a brochure-ready payload.
+
+    Keeps field names stable for tests and downstream consumers without
+    mutating the source object.
+    """
+    if property_obj is None:
+        return {}
+
+    data = property_obj if isinstance(property_obj, dict) else {}
+    title = _dict_get(property_obj, "title") or data.get("title") or "Property"
+    description = (
+        _dict_get(property_obj, "description") or data.get("description") or ""
+    )
+    property_type = _dict_get(property_obj, "property_type") or data.get(
+        "property_type"
+    )
+    location = _dict_get(property_obj, "location") or data.get("location")
+
+    price = (
+        _dict_get(property_obj, "price_aed")
+        or _dict_get(property_obj, "price")
+        or data.get("price_aed")
+        or data.get("price")
+    )
+    price_numeric = _coerce_decimal(price)
+
+    specs = {
+        "price_aed": price_numeric,
+        "bedrooms": _dict_get(property_obj, "bedrooms"),
+        "bathrooms": _dict_get(property_obj, "bathrooms"),
+        "area_sqft": _coerce_decimal(_dict_get(property_obj, "area_sqft")),
+        "parking_spaces": _dict_get(property_obj, "parking_spaces"),
+        "view_type": _dict_get(property_obj, "view_type"),
+        "furnishing_status": _dict_get(property_obj, "furnishing_status"),
+    }
+
+    features = _dict_get(property_obj, "features")
+    if hasattr(property_obj, "features_dict"):
+        features = property_obj.features_dict
+    features = features or {}
+
+    market_data = _dict_get(property_obj, "market_data")
+    if hasattr(property_obj, "market_data_dict"):
+        market_data = property_obj.market_data_dict
+    market_data = market_data or {}
+
+    neighborhood = _dict_get(property_obj, "neighborhood_data")
+    if hasattr(property_obj, "neighborhood_data_dict"):
+        neighborhood = property_obj.neighborhood_data_dict
+    neighborhood = neighborhood or {}
+
+    images = _dict_get(property_obj, "property_images") or []
+    images = _as_list(images)
+
+    agent = _dict_get(property_obj, "agent")
+    agent_first = _dict_get(agent, "first_name", "")
+    agent_last = _dict_get(agent, "last_name", "")
+    name_candidates: Iterable[Optional[str]] = (
+        f"{agent_first} {agent_last}".strip(),
+        _dict_get(agent, "full_name"),
+        _dict_get(agent, "name"),
+    )
+    agent_name = next((name for name in name_candidates if name), "Assigned Agent")
+
+    contact = {
+        "agent_id": _dict_get(agent, "id") or _dict_get(property_obj, "agent_id"),
+        "agent_name": agent_name,
+        "email": _dict_get(agent, "email"),
+        "phone_number": _dict_get(agent, "phone_number"),
+        "office": _dict_get(agent, "office"),
+    }
+
+    return {
+        "id": _dict_get(property_obj, "id"),
+        "title": title,
+        "description": description,
+        "property_type": property_type,
+        "location": location,
+        "specs": specs,
+        "features": features,
+        "market_data": market_data,
+        "neighborhood_data": neighborhood,
+        "property_images": images,
+        "contact": contact,
+    }
 
 
 class AIContentGenerator:
@@ -176,10 +368,11 @@ Tone: Clear, confident, market-aware
 
     async def generate_content(
         self,
-        user_input: str,
-        content_type: ContentType,
+        user_input: Optional[str] = None,
+        content_type: Optional[ContentType] = None,
         context: Optional[Dict[str, Any]] = None,
         quality_requirements: Optional[Dict[str, Any]] = None,
+        **extra_kwargs: Any,
     ) -> IntelligenceContent:
         """
         Generate content based on user input.
@@ -189,10 +382,25 @@ Tone: Clear, confident, market-aware
             content_type: Type of content to generate
             context: Additional context data
             quality_requirements: Quality thresholds
+            extra_kwargs: Compatibility kwargs (user_id, prompt, timeout_seconds, etc.)
 
         Returns:
             IntelligenceContent with generated data
         """
+        prompt = extra_kwargs.pop("prompt", None)
+        fallback_text = extra_kwargs.pop("text", None)
+        user_input = user_input or prompt or fallback_text or ""
+        if not content_type:
+            content_type = self._detect_content_type(user_input)
+        if not content_type:
+            content_type = ContentType.GENERAL
+
+        # Ignore legacy kwargs such as user_id/timeout_seconds without raising
+        extra_kwargs.pop("user_id", None)
+        extra_kwargs.pop("timeout_seconds", None)
+        extra_kwargs.pop("request_id", None)
+        extra_kwargs.pop("agent_id", None)
+
         start_time = datetime.utcnow()
 
         if self.mock_mode:
@@ -502,26 +710,38 @@ Tone: Clear, confident, market-aware
 
         if any(
             term in input_lower
+            for term in [
+                "brochure",
+                "listing brochure",
+                "property brochure",
+                "marketing brochure",
+                "flyer",
+                "sell sheet",
+                "one pager",
+            ]
+        ):
+            return ContentType.PROPERTY_BROCHURE
+        if any(
+            term in input_lower
             for term in ["cma", "comparative market", "market analysis", "valuation"]
         ):
             return ContentType.CMA_REPORT
-        elif any(
+        if any(
             term in input_lower
             for term in ["social", "post", "instagram", "facebook", "twitter"]
         ):
             return ContentType.SOCIAL_POST
-        elif any(
+        if any(
             term in input_lower
             for term in ["pitch", "presentation", "deck", "investor"]
         ):
             return ContentType.PITCH_DECK
-        elif any(
+        if any(
             term in input_lower
             for term in ["market report", "market trend", "market overview"]
         ):
             return ContentType.MARKET_REPORT
-        else:
-            return ContentType.GENERAL
+        return ContentType.GENERAL
 
     async def _generate_cma_content(
         self, user_input: str, context: Optional[Dict[str, Any]] = None
@@ -727,15 +947,7 @@ Tone: Clear, confident, market-aware
 
     def _format_price(self, value: Any) -> str:
         """Format numeric price values to AED string"""
-        if value is None:
-            return "AED —"
-        try:
-            numeric = float(value)
-            if numeric <= 0:
-                return "AED —"
-            return f"AED {numeric:,.0f}"
-        except Exception:
-            return str(value)
+        return format_aed(value)
 
     async def _generate_general_content(
         self, user_input: str, context: Optional[Dict[str, Any]] = None

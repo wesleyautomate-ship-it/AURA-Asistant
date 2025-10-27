@@ -16,11 +16,12 @@ from .database import get_db
 from .models import User, UserSession, Role, Permission, AuditLog
 from .utils import verify_jwt_token, sanitize_input
 from .rate_limiter import RateLimiter
+from app.core.dev_auth_bypass import maybe_get_dev_user
 
 logger = logging.getLogger(__name__)
 
 # Security scheme
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Rate limiter instance
 rate_limiter = RateLimiter()
@@ -56,7 +57,8 @@ class AuthMiddleware:
             await self.app(scope, receive, send)
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """
@@ -72,6 +74,18 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
+    # TODO: remove DEV_AUTH_BYPASS guard before merging to main; dev-only feature
+    dev_user = maybe_get_dev_user(request.url.path)
+    if dev_user:
+        return dev_user
+
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
     try:
         # Verify JWT token
         payload = verify_jwt_token(credentials.credentials)
@@ -317,6 +331,7 @@ def require_employee_or_admin(current_user: User = Depends(get_current_user)) ->
 
 # Optional authentication for endpoints that can work with or without auth
 def get_optional_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
@@ -334,6 +349,6 @@ def get_optional_user(
         return None
     
     try:
-        return get_current_user(credentials, db)
+        return get_current_user(request, credentials, db)
     except HTTPException:
         return None

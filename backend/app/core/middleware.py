@@ -19,19 +19,18 @@ from .database import get_db
 from .models import User, UserSession, Role, Permission, AuditLog
 from .utils import verify_jwt_token, sanitize_input
 from .rate_limiter import RateLimiter
-from .dev_auth_bypass import is_development_mode, get_dev_user
+from .dev_auth_bypass import maybe_get_dev_user
 from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 # Security scheme
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Rate limiter instance
 rate_limiter = RateLimiter()
 
 settings = get_settings()
-_dev_bypass_warned = False
 
 
 class AuthMiddleware:
@@ -130,9 +129,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
-    ),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
     """
@@ -148,39 +146,10 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    # Development bypass for testing - works without credentials
-    if settings.DEV_AUTH_ALLOW and is_development_mode():
-        global _dev_bypass_warned
-        if not _dev_bypass_warned:
-            logger.warning("DEV AUTH BYPASS ENABLED  FOR DEVELOPMENT ONLY")
-            _dev_bypass_warned = True
-        logger.info("[DEV_AUTH] Development mode authentication bypass active")
-        dev_user_data = get_dev_user("admin")  # Default to admin for development
-        if dev_user_data:
-            logger.info(
-                f"[DEV_AUTH] Returning dev user: {dev_user_data['email']} ({dev_user_data['role']})"
-            )
-            # Create a mock User object for development
-            class DevUser:
-                def __init__(self, user_data):
-                    self.id = user_data["id"]
-                    self.email = user_data["email"]
-                    self.first_name = user_data["first_name"]
-                    self.last_name = user_data["last_name"]
-                    self.role = user_data["role"]
-                    self.is_active = user_data["is_active"]
-                    self.email_verified = user_data["email_verified"]
-                    self.is_dev_user = True
-
-                    @property
-                    def full_name(self):
-                        return f"{self.first_name} {self.last_name}"
-
-                    @property
-                    def is_locked(self):
-                        return False
-
-            return DevUser(dev_user_data)
+    # TODO: remove DEV_AUTH_BYPASS guard before merging to main; dev-only feature
+    dev_user = maybe_get_dev_user(request.url.path)
+    if dev_user:
+        return dev_user
 
     # Production mode requires credentials
     if not credentials:
@@ -455,6 +424,7 @@ def require_employee_or_admin(current_user: User = Depends(get_current_user)) ->
 
 # Optional authentication for endpoints that can work with or without auth
 def get_optional_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> Optional[User]:
@@ -472,6 +442,6 @@ def get_optional_user(
         return None
 
     try:
-        return get_current_user(credentials, db)
+        return get_current_user(request, credentials, db)
     except HTTPException:
         return None

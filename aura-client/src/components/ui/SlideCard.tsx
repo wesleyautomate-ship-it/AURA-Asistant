@@ -115,7 +115,6 @@ export default function SlideCard({
   const IconComponent = config.icon;
 
   const slideHeight = compact ? 'h-64' : 'h-96';
-  const aspectRatio = '16:9'; // Standard presentation aspect ratio
 
   return (
     <motion.div

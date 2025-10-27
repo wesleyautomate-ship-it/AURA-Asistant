@@ -1,241 +1,76 @@
-#!/usr/bin/env python3
-"""
-Development Authentication Bypass
-=================================
-
-This module provides development-only authentication bypass functionality.
-It should NEVER be used in production environments.
-
-Features:
-- Auto-login with predefined development users
-- Bypass authentication middleware in development
-- Generate valid JWT tokens for development users
-"""
-
-import os
 import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from fastapi import HTTPException, Depends
-from sqlalchemy.orm import Session
-import jwt
+import os
+from dataclasses import dataclass, field
+from typing import List, Optional
 
-try:
-    from jwt.exceptions import JWTError
-except ImportError:
-    # For older versions of PyJWT
-    from jwt import InvalidTokenError as JWTError
-
-from .settings import (
-    SECRET_KEY,
-    JWT_ALGORITHM,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    get_settings,
-)
+from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Simplified imports to avoid circular dependencies
-# from .database import get_db
-# from .models import User
-# from .token_manager import generate_access_token
 
-# Development users - NEVER use in production
-DEV_USERS = {
-    "admin": {
-        "id": 1,
-        "email": "admin@dubai-estate.com",
-        "first_name": "Development",
-        "last_name": "Admin",
-        "role": "admin",
-        "is_active": True,
-        "email_verified": True,
-    },
-    "agent": {
-        "id": 2,
-        "email": "agent@dubai-estate.com",
-        "first_name": "Development",
-        "last_name": "Agent",
-        "role": "agent",
-        "is_active": True,
-        "email_verified": True,
-    },
-    "employee": {
-        "id": 3,
-        "email": "employee@dubai-estate.com",
-        "first_name": "Development",
-        "last_name": "Employee",
-        "role": "employee",
-        "is_active": True,
-        "email_verified": True,
-    },
-}
+@dataclass
+class DevBypassUser:
+    """Simple stand-in user object for dev bypass."""
 
+    id: int = 0
+    email: str = "dev@local"
+    first_name: str = "Dev"
+    last_name: str = "Bypass"
+    role: str = "admin"
+    is_active: bool = True
+    email_verified: bool = True
+    is_superuser: bool = True
+    roles: List[str] = field(default_factory=lambda: ["admin"])
+    scopes: List[str] = field(default_factory=lambda: ["*"])
+    permissions: List[str] = field(default_factory=lambda: ["*"])
+    brokerage_id: Optional[int] = None
+    is_dev_user: bool = True
+    full_name: str = field(init=False)
 
-def _dev_auth_enabled() -> bool:
-    return bool(getattr(get_settings(), "DEV_AUTH_ALLOW", False))
+    def __post_init__(self) -> None:
+        self.full_name = f"{self.first_name} {self.last_name}".strip()
 
-
-def is_development_mode() -> bool:
-    """Check if we're running in development mode"""
-    if not _dev_auth_enabled():
+    @property
+    def is_locked(self) -> bool:  # pragma: no cover - simple getter
         return False
 
-    # Check DISABLE_AUTH flag first (for explicit bypass)
-    disable_auth = os.getenv("DISABLE_AUTH", "false").lower() in ("true", "1", "yes")
-    if disable_auth:
-        logger.info("[DEV_AUTH] DISABLE_AUTH is set, returning True")
+
+def _environment_name(settings) -> str:
+    env = getattr(settings, "ENV", None) or os.getenv("ENV")
+    env = env or getattr(settings, "ENVIRONMENT", None) or os.getenv(
+        "ENVIRONMENT", "development"
+    )
+    return str(env).lower()
+
+
+def _bypass_enabled(settings) -> bool:
+    if not getattr(settings, "DEV_AUTH_BYPASS", False):
+        return False
+
+    env = _environment_name(settings)
+    if env in {"development", "dev", "local"}:
         return True
 
-    environment = os.getenv("ENVIRONMENT", "development")
-    debug = os.getenv("DEBUG", "False").lower() == "true"
-    result = environment in ["development", "docker"] or debug
-    logger.debug(
-        "[DEV_AUTH] Environment=%s Debug=%s Result=%s", environment, debug, result
+    # Allow explicit debug flag for app.debug style configs
+    return bool(getattr(settings, "debug", False))
+
+
+def maybe_get_dev_user(request_path: Optional[str] = None) -> Optional[DevBypassUser]:
+    """
+    Return a fake user when the dev bypass is explicitly enabled.
+
+    Args:
+        request_path: Used for logging so we can audit bypass usage.
+    """
+    settings = get_settings()
+    if not _bypass_enabled(settings):
+        return None
+
+    dev_user = DevBypassUser(id=1, email="dev@local", first_name="Dev", last_name="Bypass")
+    logger.warning(
+        "DEV AUTH BYPASS ENABLED \u2014 returning fake user (id=%s, email=%s) for route %s",
+        dev_user.id,
+        dev_user.email,
+        request_path or "<unknown>",
     )
-    return result
-
-
-def get_dev_user(role: str = "agent") -> Optional[Dict[str, Any]]:
-    """
-    Get a development user by role
-
-    Args:
-        role: User role (admin, agent, employee)
-
-    Returns:
-        Development user data or None if not in dev mode
-    """
-    if not is_development_mode():
-        return None
-
-    return DEV_USERS.get(role, DEV_USERS["agent"])
-
-
-def create_dev_token(role: str = "agent") -> Optional[str]:
-    """
-    Create a development JWT token
-
-    Args:
-        role: User role for the token
-
-    Returns:
-        JWT token string or None if not in dev mode
-    """
-    if not is_development_mode():
-        return None
-
-    dev_user = get_dev_user(role)
-    if not dev_user:
-        return None
-
-    # Create token with development user data
-    token_data = {
-        "sub": str(dev_user["id"]),
-        "email": dev_user["email"],
-        "role": dev_user["role"],
-        "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-        "dev_mode": True,  # Flag to indicate this is a dev token
-    }
-
-    return jwt.encode(token_data, SECRET_KEY, algorithm=JWT_ALGORITHM)
-
-
-def get_dev_current_user(
-    # db: Session = Depends(get_db)  # Simplified for development
-) -> Optional[dict]:
-    """
-    Get current user with development bypass
-
-    This function can be used as a dependency to automatically
-    authenticate development users without requiring login.
-    """
-    if not is_development_mode():
-        return None
-
-    # Return a mock user object for development
-    # In a real scenario, you might want to create/fetch from database
-    dev_user_data = get_dev_user("agent")
-    if not dev_user_data:
-        return None
-
-    # Create a mock User object
-    class DevUser:
-        def __init__(self, user_data):
-            self.id = user_data["id"]
-            self.email = user_data["email"]
-            self.first_name = user_data["first_name"]
-            self.last_name = user_data["last_name"]
-            self.role = user_data["role"]
-            self.is_active = user_data["is_active"]
-            self.email_verified = user_data["email_verified"]
-            self.is_dev_user = True
-
-    return DevUser(dev_user_data)
-
-
-def dev_login_endpoint_data(role: str = "agent") -> Dict[str, Any]:
-    """
-    Generate login response data for development
-
-    Args:
-        role: User role (admin, agent, employee)
-
-    Returns:
-        Login response data matching the real login endpoint
-    """
-    if not is_development_mode():
-        raise HTTPException(
-            status_code=403, detail="Development login not available in production"
-        )
-
-    dev_user = get_dev_user(role)
-    if not dev_user:
-        raise HTTPException(status_code=400, detail=f"Invalid development role: {role}")
-
-    access_token = create_dev_token(role)
-    if not access_token:
-        raise HTTPException(
-            status_code=500, detail="Failed to create development token"
-        )
-
-    return {
-        "access_token": access_token,
-        "refresh_token": f"dev-refresh-{role}",
-        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        "user": {
-            "id": dev_user["id"],
-            "email": dev_user["email"],
-            "first_name": dev_user["first_name"],
-            "last_name": dev_user["last_name"],
-            "role": dev_user["role"],
-            "is_active": dev_user["is_active"],
-            "email_verified": dev_user["email_verified"],
-        },
-    }
-
-
-# Development middleware bypass
-def should_bypass_auth() -> bool:
-    """Check if authentication should be bypassed in development"""
-    return is_development_mode()
-
-
-def get_dev_auth_headers(role: str = "agent") -> Dict[str, str]:
-    """
-    Get development authentication headers
-
-    Args:
-        role: User role for authentication
-
-    Returns:
-        Headers dict with Authorization header
-    """
-    if not is_development_mode():
-        return {}
-
-    token = create_dev_token(role)
-    if not token:
-        return {}
-
-    return {"Authorization": f"Bearer {token}"}
+    return dev_user

@@ -20,7 +20,6 @@ from sqlalchemy import (
     ForeignKey,
     DECIMAL,
     JSON,
-    ARRAY,
     Date,
     UUID,
 )

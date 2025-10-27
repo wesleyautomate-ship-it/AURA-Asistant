@@ -40,8 +40,8 @@ from . import Base
 class EnhancedProperty(Base):
     """Enhanced property model with comprehensive real estate data"""
 
-    __tablename__ = "properties"
-    __table_args__ = {'extend_existing': True}
+    __tablename__ = "enhanced_properties"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
@@ -87,18 +87,18 @@ class EnhancedProperty(Base):
         "User", foreign_keys=[agent_id], back_populates="managed_properties"
     )
     creator = relationship("User", foreign_keys=[created_by])
-    # transactions = relationship("Transaction", back_populates="property")
-    # viewings = relationship("PropertyViewing", back_populates="property")
-    # compliance_records = relationship("RERACompliance", back_populates="property")
-    # listing_history = relationship(
-    #     "ListingHistory", back_populates="property", cascade="all, delete-orphan"
-    # )
-    # confidential_details = relationship(
-    #     "PropertyConfidential",
-    #     back_populates="property",
-    #     uselist=False,
-    #     cascade="all, delete-orphan",
-    # )
+    transactions = relationship("Transaction", back_populates="property", cascade="all, delete-orphan")
+    viewings = relationship("PropertyViewing", back_populates="property", cascade="all, delete-orphan")
+    compliance_records = relationship("RERACompliance", back_populates="property", cascade="all, delete-orphan")
+    listing_history = relationship(
+        "ListingHistory", back_populates="property", cascade="all, delete-orphan"
+    )
+    confidential_details = relationship(
+        "PropertyConfidential",
+        back_populates="property",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<EnhancedProperty(id={self.id}, title='{self.title}', price_aed={self.price_aed})>"
@@ -188,12 +188,10 @@ class EnhancedLead(Base):
         "User", foreign_keys=[assigned_agent_id], back_populates="assigned_leads"
     )
     legacy_agent = relationship("User", foreign_keys=[agent_id])
-    # lead_history = relationship(
-    #     "LeadHistory", back_populates="lead", cascade="all, delete-orphan"
-    # )
-    # viewings = relationship("PropertyViewing", back_populates="lead")
-    # appointments = relationship("Appointment", back_populates="lead")
-    # client = relationship("EnhancedClient", back_populates="lead", uselist=False)
+    # lead_history = relationship("LeadHistory", back_populates="lead", cascade="all, delete-orphan")
+    viewings = relationship("PropertyViewing", back_populates="lead", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="lead", cascade="all, delete-orphan")
+    client = relationship("EnhancedClient", back_populates="lead", uselist=False)
 
     def __repr__(self):
         return f"<EnhancedLead(id={self.id}, name='{self.name}', nurture_status='{self.nurture_status}')>"
@@ -257,12 +255,12 @@ class EnhancedClient(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    # lead = relationship("EnhancedLead", back_populates="client")
+    lead = relationship("EnhancedLead", back_populates="client", uselist=False)
     assigned_agent = relationship(
         "User", foreign_keys=[assigned_agent_id], back_populates="assigned_clients"
     )
-    # transactions = relationship("Transaction", back_populates="buyer")
-    # appointments = relationship("Appointment", back_populates="client")
+    transactions = relationship("Transaction", foreign_keys="Transaction.buyer_id", back_populates="buyer", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="client", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<EnhancedClient(id={self.id}, name='{self.name}', client_type='{self.client_type}')>"
@@ -272,6 +270,7 @@ class ContactNote(Base):
     """Free-form notes attached to a client (contact)."""
 
     __tablename__ = "contact_notes"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     contact_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
@@ -301,6 +300,7 @@ class ContactActivity(Base):
             "kind in ('call','email','whatsapp','meeting','ai')",
             name="ck_activities_kind",
         ),
+        {"extend_existing": True},
     )
 
 
@@ -325,6 +325,7 @@ class FollowUp(Base):
             "channel in ('call','email','whatsapp','meeting')",
             name="ck_followups_channel",
         ),
+        {"extend_existing": True},
     )
 
 
@@ -380,7 +381,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    property_id = Column(Integer, ForeignKey("properties.id"), index=True)
+    property_id = Column(Integer, ForeignKey("enhanced_properties.id"), index=True)
     buyer_id = Column(Integer, ForeignKey("clients.id"), index=True)
     seller_id = Column(Integer, ForeignKey("clients.id"))
     agent_id = Column(Integer, ForeignKey("users.id"), index=True)
@@ -446,7 +447,7 @@ class ListingHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     property_id = Column(
-        Integer, ForeignKey("properties.id"), nullable=False, index=True
+        Integer, ForeignKey("enhanced_properties.id"), nullable=False, index=True
     )
     event_type = Column(String(50), nullable=False, index=True)
     old_value = Column(String(255))
@@ -469,7 +470,7 @@ class PropertyConfidential(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     property_id = Column(
-        Integer, ForeignKey("properties.id"), unique=True, nullable=False
+        Integer, ForeignKey("enhanced_properties.id"), unique=True, nullable=False
     )
     unit_number = Column(String(100))
     plot_number = Column(String(100))
@@ -490,7 +491,7 @@ class PropertyViewing(Base):
     __tablename__ = "property_viewings"
 
     id = Column(Integer, primary_key=True, index=True)
-    property_id = Column(Integer, ForeignKey("properties.id"), index=True)
+    property_id = Column(Integer, ForeignKey("enhanced_properties.id"), index=True)
     lead_id = Column(Integer, ForeignKey("leads.id"), index=True)
     agent_id = Column(Integer, ForeignKey("users.id"), index=True)
     viewing_date = Column(DateTime, nullable=False, index=True)
@@ -551,7 +552,7 @@ class RERACompliance(Base):
     __tablename__ = "rera_compliance"
 
     id = Column(Integer, primary_key=True, index=True)
-    property_id = Column(Integer, ForeignKey("properties.id"), index=True)
+    property_id = Column(Integer, ForeignKey("enhanced_properties.id"), index=True)
     compliance_status = Column(String(20), default="unknown", index=True)
     rera_number = Column(String(50))
     compliance_check_date = Column(Date)

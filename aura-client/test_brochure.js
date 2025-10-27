@@ -1,18 +1,17 @@
 /**
  * Test script for brochure workflow
- * Run with: node test_brochure.js
+ * Run with: npm run test:brochure
  */
 
-// Mock environment
-global.import = {
-  meta: {
-    env: {
-      VITE_API_BASE_URL: 'http://localhost:8000',
-      VITE_API_BASE: '/api/v1',
-      VITE_BACKEND_ENABLED: '1'
-    }
-  }
-};
+if (!import.meta?.env) {
+  console.error('⚠️  `import.meta.env` is undefined. Run this script via `npm run test:brochure` so vite-node can provide the Vite environment.');
+  process.exit(1);
+}
+
+if (import.meta.env.VITE_USE_REAL_API !== 'false') {
+  console.log('dY"? Forcing VITE_USE_REAL_API=false for test harness (uses mocked HTTP calls)');
+  import.meta.env.VITE_USE_REAL_API = 'false';
+}
 
 // Mock fetch globally
 global.fetch = async (url, options = {}) => {

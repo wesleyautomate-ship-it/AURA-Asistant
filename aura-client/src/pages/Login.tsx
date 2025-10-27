@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Loader2, Lock, LogIn, Mail, Shield } from 'lucide-react'
 import { useAuth, useAuthActions } from '../store/authStore'
 
@@ -9,7 +9,9 @@ interface LocationState {
   }
 }
 
-const USE_REAL_API = import.meta.env.VITE_USE_REAL_API === 'true'
+const FORCE_DEV_AUTH =
+  import.meta.env.VITE_AUTH_MODE === 'mock' || import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
+const USE_REAL_API = !FORCE_DEV_AUTH && import.meta.env.VITE_USE_REAL_API === 'true'
 const DEV_EMAIL = import.meta.env.VITE_DEV_LOGIN_EMAIL || 'admin@propertypro.ai'
 const DEV_PASSWORD = import.meta.env.VITE_DEV_LOGIN_PASSWORD || 'Admin123!'
 
@@ -35,6 +37,12 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, redirectPath])
 
+  useEffect(() => {
+    if (!FORCE_DEV_AUTH && isAuthenticated) {
+      navigate(redirectPath, { replace: true })
+    }
+  }, [isAuthenticated, navigate, redirectPath])
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
@@ -56,7 +64,22 @@ export default function Login() {
   }
 
   const effectiveLoading = isLoading || submitting
-  const showDevNotice = !USE_REAL_API
+  const showDevNotice = !USE_REAL_API || FORCE_DEV_AUTH
+
+  if (FORCE_DEV_AUTH && isAuthenticated) {
+    return <Navigate to={redirectPath} replace />
+  }
+
+  if (FORCE_DEV_AUTH) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 text-center shadow-lg">
+          <p className="text-sm font-medium">Developer authentication bypass is enabled.</p>
+          <p className="mt-2 text-xs text-slate-300">Initialising your workspace session...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12">
@@ -158,3 +181,4 @@ export default function Login() {
     </div>
   )
 }
+

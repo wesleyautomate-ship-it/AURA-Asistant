@@ -105,7 +105,43 @@ export async function orchestrateCommand(
       };
     }
   }
-  
+
+  // Step 4.1: Dedicated brochure workflow (prioritized before generic validation)
+  if (intent.type === 'BROCHURE') {
+    if (!shouldUseWorkflowAPIs()) {
+      return {
+        intent,
+        fallbackToStream: true,
+        parentId,
+        validationStatus: 'fallback',
+        userMessage: generateWorkflowFailureMessage(intent),
+        error: 'Workflow execution disabled',
+      };
+    }
+
+    const workflowResponse = await executeBrochureWorkflow(prompt, intent);
+    if (workflowResponse.success) {
+      return {
+        intent,
+        workflowResponse,
+        fallbackToStream: false,
+        parentId,
+        validationStatus: 'valid',
+        userMessage: workflowResponse.message,
+      };
+    }
+
+    return {
+      intent,
+      workflowResponse,
+      fallbackToStream: true,
+      parentId,
+      validationStatus: 'fallback',
+      userMessage: generateWorkflowFailureMessage(intent),
+      error: workflowResponse.error || 'Brochure workflow failed',
+    };
+  }
+
   // Step 5: Pre-validate payload before attempting workflow
   const validation = validateWorkflowPayload(intent);
   console.log(`[Orchestrator] Payload validation: ${validation.isValid ? '✅ Valid' : '❌ Invalid'} - Missing: ${validation.missingFields.join(', ')}`);

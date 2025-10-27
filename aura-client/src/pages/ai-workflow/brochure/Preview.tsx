@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Share2, Download, Save } from 'lucide-react';
 import { brochureDraftService } from '../../../services/brochureDrafts';

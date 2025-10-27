@@ -30,35 +30,35 @@ interface ReportPreviewCardProps {
 }
 
 // Content type configurations for display
-const CONTENT_CONFIG: Record<ContentType, {
+const CONTENT_CONFIG: Partial<Record<ContentType, {
   icon: React.ComponentType<any>;
   color: string;
   bgColor: string;
   label: string;
   description: string;
-}> = {
-  CMA: {
+}>> = {
+  [ContentType.CMA_REPORT]: {
     icon: BarChart3,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
     label: 'CMA Report',
     description: 'Comprehensive market analysis with comparables'
   },
-  PITCH_DECK: {
+  [ContentType.PITCH_DECK]: {
     icon: FileText,
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
     label: 'Investor Pitch Deck',
     description: 'Professional presentation for investors'
   },
-  SOCIAL_POST: {
+  [ContentType.SOCIAL_POST]: {
     icon: Share2,
     color: 'text-green-600',
     bgColor: 'bg-green-50',
     label: 'Social Content',
     description: 'Engaging content for social media'
   },
-  MARKET_REPORT: {
+  [ContentType.MARKET_REPORT]: {
     icon: BarChart3,
     color: 'text-orange-600',
     bgColor: 'bg-orange-50',

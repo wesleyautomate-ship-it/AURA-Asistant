@@ -1,0 +1,10 @@
+/**
+ * Test script for brochure workflow
+ * Run with: npm run test:brochure
+ */
+
+if (!import.meta?.env) {
+  console.error('�?O  `import.meta.env` is undefined. Run this script via `npm run test:brochure` so vite-node can provide the Vite environment.');
+  process.exit(1);
+}
+
