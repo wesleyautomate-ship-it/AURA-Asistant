@@ -33,7 +33,7 @@ function fromServer(d: api.BrochureDraftOut): BrochureDraft {
 }
 
 async function createDraft(template: BrochureTemplateKey): Promise<BrochureDraft> {
-  const server = await api.createDraft(template);
+  const server = await api.createDraft({ templateKey: template });
   return fromServer(server);
 }
 
@@ -46,6 +46,7 @@ async function updateDraft(id: string, patch: Partial<BrochureDraft>): Promise<B
   // Map client patch to server patch under data
   const dataPatch: any = {};
   if (patch.propertyId !== undefined) dataPatch.propertyId = patch.propertyId;
+  if (patch.listingData) dataPatch.listingData = patch.listingData;
   if (patch.brand) {
     dataPatch.branding = {
       primary: patch.brand.primary,
@@ -58,7 +59,13 @@ async function updateDraft(id: string, patch: Partial<BrochureDraft>): Promise<B
     dataPatch.about = { body: patch.content.description || '', heading: patch.content.title || '' };
     dataPatch.whyInvest = { bullets: patch.content.highlights || [] };
   }
-  const server = await api.updateDraft(id, { data: Object.keys(dataPatch).length ? dataPatch : undefined, status: patch.status });
+  const payload: api.BrochureDraftPatch = {};
+  if (Object.keys(dataPatch).length) payload.data = dataPatch;
+  if (patch.status !== undefined) payload.status = patch.status;
+  if (patch.propertyId !== undefined) payload.property_id = patch.propertyId;
+  if (patch.error !== undefined) payload.error = patch.error;
+  if (patch.output?.pdfUrl) payload.download_url = patch.output.pdfUrl;
+  const server = await api.updateDraft(id, payload);
   return fromServer(server);
 }
 

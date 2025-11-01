@@ -4,7 +4,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -20,6 +20,7 @@ from app.domain.listings.enhanced_real_estate_models import (
     EnhancedClient,
     FollowUp as FollowUpModel,
 )
+from app.seed_contacts import DEFAULT_SHEET_URL, import_contacts_from_google_sheet
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,10 @@ class ContactDetail(BaseModel):
     notes: str
     intentScore: Optional[int] = None
     signals: Optional[List[str]] = None
+    area: Optional[str] = None
+    budget: Optional[Dict[str, Optional[float]]] = None
+    pipeline: Optional[str] = None
+    risks: Optional[List[str]] = None
 
 
 class ActivityItem(BaseModel):
@@ -61,6 +66,18 @@ class ContactNotesResponse(BaseModel):
     id: str
     notes: str
     updatedAt: str
+
+
+class GoogleSheetImportRequest(BaseModel):
+    sheetUrl: Optional[str] = None
+
+
+class GoogleSheetImportResponse(BaseModel):
+    total: int
+    created: int
+    updated: int
+    skipped: int
+    errors: List[str]
 
 
 def _ensure_db(db: Optional[Session]) -> Session:
@@ -82,6 +99,37 @@ def _to_iso(dt: Optional[datetime]) -> Optional[str]:
     if dt.tzinfo:
         return dt.isoformat()
     return dt.isoformat() + "Z"
+
+
+@router.post(
+    "/contacts/import/google-sheet",
+    response_model=GoogleSheetImportResponse,
+    tags=["Contacts"],
+)
+async def import_contacts_from_google_sheet_endpoint(
+    payload: GoogleSheetImportRequest = GoogleSheetImportRequest(),
+    db: Optional[Session] = Depends(get_db),
+) -> GoogleSheetImportResponse:
+    session = _ensure_db(db)
+    sheet_url = payload.sheetUrl or DEFAULT_SHEET_URL
+
+    try:
+        summary = import_contacts_from_google_sheet(session, sheet_url=sheet_url)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to import contacts from Google Sheet")
+        raise HTTPException(
+            status_code=500, detail="Failed to import contacts"
+        ) from exc
+
+    return GoogleSheetImportResponse(
+        total=summary.total_rows,
+        created=summary.created,
+        updated=summary.updated,
+        skipped=summary.skipped,
+        errors=list(summary.errors),
+    )
 
 
 @router.get("/contacts", response_model=List[ContactBrief])
@@ -209,6 +257,52 @@ async def get_contact(
 
     last_activity_at = _to_iso(last_activity[0]) if last_activity else None
 
+    def _as_float(value):
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    budget_data: Optional[Dict[str, Optional[float]]] = None
+    budget_min = getattr(contact, "budget_min", None)
+    budget_max = getattr(contact, "budget_max", None)
+    if budget_min is not None or budget_max is not None:
+        budget_data = {
+            "min": _as_float(budget_min),
+            "max": _as_float(budget_max),
+            "currency": "AED",
+        }
+        if budget_data["min"] is None and budget_data["max"] is None:
+            budget_data = None
+
+    area = getattr(contact, "preferred_location", None)
+    pipeline = getattr(contact, "client_status", None)
+
+    signals_list: List[str] = []
+    raw_preferences = getattr(contact, "preferences", None)
+    if raw_preferences:
+        try:
+            pref = json.loads(raw_preferences) if isinstance(raw_preferences, str) else raw_preferences
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pref = None
+        if isinstance(pref, list):
+            signals_list.extend([str(item) for item in pref if item])
+        elif isinstance(pref, dict):
+            signals_list.extend([f"{k}: {v}" for k, v in pref.items() if v])
+    if area:
+        signals_list.insert(0, f"Prefers {area}")
+    signals_value: Optional[List[str]] = signals_list or None
+
+    risks_list: List[str] = []
+    recent_activity = last_activity[0] if last_activity else getattr(contact, "last_activity_at", None)
+    if isinstance(recent_activity, datetime):
+        delta = datetime.utcnow() - recent_activity
+        if delta.days >= 14:
+            risks_list.append(f"Dormant {delta.days} days")
+    risks_value: Optional[List[str]] = risks_list or None
+
     return ContactDetail(
         id=str(contact.id),
         name=contact.name,
@@ -218,7 +312,11 @@ async def get_contact(
         lastActivityAt=last_activity_at,
         notes=latest_note.body if latest_note else "",
         intentScore=None,
-        signals=None,
+        signals=signals_value,
+        area=area,
+        budget=budget_data,
+        pipeline=pipeline,
+        risks=risks_value,
     )
 
 

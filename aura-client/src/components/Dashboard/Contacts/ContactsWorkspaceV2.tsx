@@ -66,7 +66,7 @@ export default function ContactsWorkspaceV2({ contacts = [], onAddContact }: Con
   const beginLongPressSelect = (id: string) => { setSelectionMode(true); setSelectedIds(prev => new Set(prev).add(id)); };
 
   return (
-    <section className="w-full">
+    <section className="w-full h-full">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
         <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
@@ -86,8 +86,8 @@ export default function ContactsWorkspaceV2({ contacts = [], onAddContact }: Con
           </div>
         </div>
 
-        <div className="flex flex-col max-h-[60vh] sm:max-h-[65vh]">
-          <div className="overflow-y-auto overscroll-contain">
+        <div className="flex flex-col h-full">
+          <div className="overflow-y-auto overscroll-contain max-h-[calc(100vh-13rem)] sm:max-h-[calc(100vh-14rem)] pb-24 sm:pb-12">
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 border-b border-gray-100">
               <div className="px-4 pt-2 pb-2 sm:px-6">
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">

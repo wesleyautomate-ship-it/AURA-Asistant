@@ -11,7 +11,7 @@ export default function AIWorkflowBrochure() {
   const [templates, setTemplates] = useState<BrochureTemplateOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    document.title = 'Brochure Templates – Aura';
+    document.title = 'Brochure Templates - Aura';
     const t = setTimeout(() => headingRef.current?.focus(), 0);
     (async () => {
       try {
@@ -38,7 +38,7 @@ export default function AIWorkflowBrochure() {
         </div>
         <section className="mt-4 space-y-4">
           {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{error}</div>}
-          {!templates && <div className="text-sm text-gray-600">Loading templates…</div>}
+          {!templates && <div className="text-sm text-gray-600">Loading templates...</div>}
           {templates && templates.length === 0 && <div className="text-sm text-gray-600">No templates available.</div>}
           {templates && templates.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

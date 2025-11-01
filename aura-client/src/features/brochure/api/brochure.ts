@@ -19,6 +19,14 @@ export interface BrochureTemplateOut {
   created_at: string
 }
 
+export interface BrochureDraftPatch {
+  data?: any
+  status?: string
+  download_url?: string | null
+  property_id?: string | null
+  error?: string | null
+}
+
 export async function createDraft(payload: {
   templateKey: string
   property_id?: string
@@ -27,7 +35,7 @@ export async function createDraft(payload: {
   if (!USE_REAL) {
     return {
       id: `draft-${Date.now()}`,
-      data: { templateKey: payload.templateKey, ...payload.data },
+      data: { templateKey: payload.templateKey, propertyId: payload.property_id, ...payload.data },
       status: 'draft',
       download_url: null,
       created_at: new Date().toISOString(),
@@ -46,7 +54,7 @@ export async function getDraft(id: string): Promise<BrochureDraftOut> {
 
 export async function updateDraft(
   id: string,
-  patch: Partial<BrochureDraftOut>
+  patch: BrochureDraftPatch
 ): Promise<BrochureDraftOut> {
   const { data } = await api.patch<BrochureDraftOut>(`/brochures/${id}`, patch)
   return data

@@ -17,6 +17,10 @@ export interface ContactDetail extends Contact {
   preferences?: string[]; // e.g. 'sea-view','3BR','Palm Jumeirah'
   budget?: { min?: number; max?: number; currency?: string };
   intentScore?: number; // 0..100
+  area?: string;
+  pipeline?: string;
+  signals?: string[];
+  risks?: string[];
   timeline: Array<{
     id: string;
     ts: string; // ISO

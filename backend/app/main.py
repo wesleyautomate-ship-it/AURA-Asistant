@@ -1,15 +1,15 @@
-﻿"""
+"""
 PropertyPro AI - Backend API (Clean Architecture)
 
 This FastAPI application provides the single canonical backend for PropertyPro AI,
 an intelligent real estate assistant designed for a mobile-first experience.
 
-ðŸ“š API Documentation:
+API Documentation:
 - Interactive API docs: http://localhost:8000/docs
 - ReDoc documentation:    http://localhost:8000/redoc
 - OpenAPI schema:         http://localhost:8000/openapi.json
 
-ðŸ” Security Features:
+Security Features:
 - User authentication with JWT tokens
 - Role-based access control (RBAC)
 - User data isolation
@@ -62,7 +62,7 @@ from werkzeug.utils import secure_filename
 
 # Import from clean architecture structure
 from app.core.settings import get_settings
-from app.core.database import get_db, SessionLocal
+from app.core.database import get_db, SessionLocal, init_db
 from app.core.middleware import (
     get_current_user,
     require_roles,
@@ -560,6 +560,12 @@ async def healthz():
     return status.liveness()
 
 
+@app.get("/api/v1/healthz")
+async def api_healthz():
+    """API-prefixed liveness endpoint (frontend compatibility)."""
+    return status.liveness()
+
+
 @app.get("/readyz")
 async def readyz():
     """Readiness endpoint for orchestrators and load balancers."""
@@ -574,9 +580,29 @@ async def readyz():
     return payload
 
 
+@app.get("/api/v1/readyz")
+async def api_readyz():
+    """API-prefixed readiness endpoint (frontend compatibility)."""
+    configured_store = (
+        getattr(settings, "object_store_path", None)
+        or getattr(settings, "OBJECT_STORE_PATH", None)
+    )
+    object_store_path = Path(configured_store) if configured_store else None
+    payload = status.readiness(SessionLocal, object_store_path)
+    if not payload.get("ok", False):
+        return JSONResponse(payload, status_code=503)
+    return payload
+
+
 @app.get("/version")
 async def version():
     """Expose build metadata."""
+    return status.version_info()
+
+
+@app.get("/api/v1/version")
+async def api_version():
+    """API-prefixed version endpoint (frontend compatibility)."""
     return status.version_info()
 
 
@@ -753,20 +779,26 @@ if documents_router:
     app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
     logger.info("Documents router included")
 
-# Export / brochure routers (PDF-dependent features)
+# Export router (PDF-dependent features)
 if pdf_feature_enabled:
     try:
         from app.api.v1.export_router import router as export_router
-        from app.api.v1.brochures_router import router as brochures_router
 
         app.include_router(export_router, tags=["Export"])
-        app.include_router(brochures_router, tags=["Brochures"])
-
         logger.info("Export router included at /api/v1/export")
     except ImportError as e:
         logger.warning(f"Export router not loaded: {e}")
 else:
-    logger.info("Export/brochure routers skipped (PDF optional features disabled)")
+    logger.info("Export router skipped (PDF optional features disabled)")
+
+# Brochure router should be available even when PDF rendering is disabled
+try:
+    from app.api.v1.brochures_router import router as brochures_router
+
+    app.include_router(brochures_router, tags=["Brochures"])
+    logger.info("Brochures router included at /api/v1/brochures")
+except ImportError as e:
+    logger.warning(f"Brochures router not loaded: {e}")
 
 if templates_router:
     app.include_router(templates_router)
@@ -912,6 +944,14 @@ if include_rag_monitoring_routes:
     include_rag_monitoring_routes(app)
     logger.info("RAG monitoring routes included")
 
+
+@app.on_event("startup")
+def ensure_database_initialized() -> None:
+    """Ensure database schema exists before serving requests."""
+    try:
+        init_db()
+    except Exception as exc:  # pragma: no cover - startup safety
+        logger.error("Database initialization failed: %s", exc)
 logger.info("Starting PropertyPro AI Backend")
 
 # Development endpoint for AI requests
@@ -1008,9 +1048,9 @@ try:
     from app.api.v1.followups_router import router as followups_router
     from app.api.v1.ai_contacts_router import router as ai_contacts_router
 
-    app.include_router(contacts_router)
-    app.include_router(followups_router)
-    app.include_router(ai_contacts_router)
+    app.include_router(contacts_router, prefix="/api/v1")
+    app.include_router(followups_router, prefix="/api/v1")
+    app.include_router(ai_contacts_router, prefix="/api/v1")
     logger.info("Contacts/followups/ai contacts routers included at root paths")
 except ImportError as e:
     logger.warning(f"Contacts/Followups/AI contacts routers not loaded: {e}")
@@ -1018,4 +1058,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 

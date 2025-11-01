@@ -31,6 +31,7 @@ class BrochureDraftUpdate(BaseModel):
     status: Optional[str] = None
     download_url: Optional[str] = None
     error: Optional[str] = None
+    property_id: Optional[str] = None
 
 
 class BrochureDraftOut(BaseModel):

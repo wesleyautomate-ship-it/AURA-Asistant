@@ -14,15 +14,18 @@ export default function Contacts() {
     setError(null);
     getContacts(ac.signal)
       .then((list) => setData(list))
-      .catch((e) => {
-        if (e?.name !== 'AbortError') setError('Failed to load contacts');
+      .catch((e: any) => {
+        if (e?.name === 'AbortError' || e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED') {
+          return;
+        }
+        setError('Failed to load contacts');
       })
       .finally(() => setLoading(false));
     return () => ac.abort();
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-blue-50 pb-28 sm:pb-20">
       <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
         {loading && (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-5">

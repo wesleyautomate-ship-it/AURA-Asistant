@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Search, CheckCircle2, Check } from 'lucide-react';
+import { ChevronLeft, Search, CheckCircle2, Check, Loader2 } from 'lucide-react';
 import { brochureDraftService } from '../../../services/brochureDrafts';
 import { renderDraft as apiRenderDraft } from '../../../features/brochure/api/brochure';
 import { useBrochureDraft } from '../../../features/brochure/hooks/useBrochureDraft';
@@ -31,17 +31,24 @@ export default function BrochureEditor() {
   const { draft, setDraft, error, saving, savedVisible, update } = useBrochureDraft(draftId);
   const [stepIndex, setStepIndex] = useState(0);
   const [genError, setGenError] = useState<string | null>(null);
+  const [autoGenerating, setAutoGenerating] = useState(false);
 
   useEffect(() => {
-    document.title = 'Brochure Editor — Aura';
+    document.title = 'Brochure Editor - Aura';
     const t = setTimeout(() => headingRef.current?.focus(), 0);
     return () => clearTimeout(t);
   }, []);
 
   // saving and savedVisible handled by hook
 
-  const onBack = () => setStepIndex((i) => Math.max(0, i - 1));
-  const onNext = () => setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
+  const onBack = () => {
+    if (autoGenerating) return;
+    setStepIndex((i) => Math.max(0, i - 1));
+  };
+  const onNext = () => {
+    if (autoGenerating) return;
+    setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
+  };
 
   const canNext = (() => {
     if (stepIndex === 0) return Boolean(draft?.propertyId);
@@ -51,12 +58,95 @@ export default function BrochureEditor() {
 
   const progress = Math.round(((stepIndex + 1) / STEPS.length) * 100);
 
+  const buildListingData = (listing: SeededListing) => ({
+    id: listing.listingId,
+    title: listing.title,
+    community: listing.location,
+    location: listing.location,
+    price_aed: listing.priceAED,
+    highlights: [
+      'Prime location in the heart of Dubai',
+      'Modern interiors and expansive living spaces',
+      'Close to lifestyle destinations and transport links',
+    ],
+  });
+
+  const buildListingContent = (listing: SeededListing) => ({
+    title: listing.title,
+    description: `Experience ${listing.title} located in ${listing.location}. This residence combines elegant design with modern convenience for discerning buyers.`,
+    highlights: [
+      'Generous floor plan with natural light',
+      'Premium finishes and contemporary styling',
+      `Asking price AED ${listing.priceAED.toLocaleString()}`,
+    ],
+  });
+
+  const buildListingBrand = () => ({
+    primary: '#2563EB',
+    secondary: '#7C3AED',
+    logoUrl: '',
+  });
+
+  const autoGenerateFromListing = useCallback(
+    async (listing: SeededListing) => {
+      if (!draftId) return;
+      setAutoGenerating(true);
+      setGenError(null);
+      try {
+        const listingData = buildListingData(listing);
+        const content = buildListingContent(listing);
+        const brand = buildListingBrand();
+
+        const updated = await brochureDraftService.updateDraft(draftId, {
+          propertyId: listing.listingId,
+          listingData,
+          content,
+          brand,
+          status: 'generating',
+        });
+        setDraft(updated);
+        setStepIndex(3);
+
+        await apiRenderDraft(draftId);
+
+        const timeoutMs = 60000;
+        const start = Date.now();
+        let latest = updated;
+
+        while (Date.now() - start < timeoutMs) {
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          latest = await brochureDraftService.getDraft(draftId);
+          setDraft(latest);
+          if (latest.status === 'ready') {
+            navigate(`/ai-workflow/brochure/preview/${draftId}`);
+            return;
+          }
+          if (latest.status === 'error') {
+            throw new Error(latest.error || 'Brochure rendering failed');
+          }
+        }
+        throw new Error('Brochure rendering timed out.');
+      } catch (err: any) {
+        setGenError(err?.message || 'Failed to generate brochure automatically.');
+        setStepIndex(3);
+      } finally {
+        setAutoGenerating(false);
+      }
+    },
+    [draftId, navigate, setDraft]
+  );
+
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-gray-50 via-white to-blue-50">
       <div className="max-w-4xl mx-auto px-4 pt-2 pb-[calc(80px+env(safe-area-inset-bottom))] sm:pt-4">
         {/* Header */}
         <div className="flex items-center gap-3 py-2 mb-2">
-          <button onClick={() => navigate('/ai-workflow/brochure')} className="p-2 -ml-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Back">
+          <button
+            onClick={() => navigate('/ai-workflow/brochure')}
+            className="p-2 -ml-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Back"
+            disabled={autoGenerating}
+          >
             <ChevronLeft className="w-5 h-5 text-gray-700" />
           </button>
           <div>
@@ -70,8 +160,11 @@ export default function BrochureEditor() {
           {STEPS.map((s, i) => (
             <button
               key={s.key}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${i === stepIndex ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-              onClick={() => setStepIndex(i)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                i === stepIndex ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+              } ${autoGenerating ? 'opacity-60 cursor-not-allowed' : ''}`}
+              onClick={() => !autoGenerating && setStepIndex(i)}
+              disabled={autoGenerating}
             >
               {s.label}
             </button>
@@ -81,9 +174,13 @@ export default function BrochureEditor() {
         {/* Steps */}
         <div className="space-y-3">
           {stepIndex === 0 && (
-            <PropertyStep draft={draft} onSelect={(listing) => {
-              update({ propertyId: listing.listingId, listingData: listing });
-            }} />
+            <PropertyStep
+              draft={draft}
+              busy={autoGenerating}
+              onSelect={async (listing) => {
+                await autoGenerateFromListing(listing);
+              }}
+            />
           )}
           {stepIndex === 1 && (
             <ContentStep draft={draft} onChange={(content) => update({ content })} />
@@ -138,7 +235,7 @@ export default function BrochureEditor() {
               <div className="flex items-center justify-between mt-1">
                 <div className="text-[11px] text-gray-500">Step {stepIndex + 1} of {STEPS.length}</div>
                 <div className="text-[11px] text-gray-500 flex items-center gap-1 min-h-[16px]">
-                  {saving && <span>Saving…</span>}
+                  {saving && <span>Saving...</span>}
                   {!saving && savedVisible && (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -159,7 +256,7 @@ export default function BrochureEditor() {
   );
 }
 
-function PropertyStep({ draft, onSelect }: { draft: BrochureDraft | null; onSelect: (l: SeededListing) => void }) {
+function PropertyStep({ draft, onSelect, busy }: { draft: BrochureDraft | null; onSelect: (l: SeededListing) => void; busy: boolean }) {
   const [query, setQuery] = useState('');
   const listings = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -172,7 +269,13 @@ function PropertyStep({ draft, onSelect }: { draft: BrochureDraft | null; onSele
   const selectedId = draft?.propertyId;
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" aria-busy={busy}>
+      {busy && (
+        <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Generating...</span>
+        </div>
+      )}
       <div className="relative">
         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input
@@ -180,7 +283,9 @@ function PropertyStep({ draft, onSelect }: { draft: BrochureDraft | null; onSele
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, area, or ID"
-          className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={busy}
+          aria-disabled={busy}
+          className={`w-full pl-9 pr-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${busy ? 'opacity-60 cursor-not-allowed' : ''}`}
         />
       </div>
       <ul className="divide-y divide-gray-200 rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
@@ -188,14 +293,24 @@ function PropertyStep({ draft, onSelect }: { draft: BrochureDraft | null; onSele
           <li key={l.listingId}>
             <button
               type="button"
-              onClick={() => onSelect(l)}
-              className={`w-full text-left px-3 py-3 flex items-center justify-between gap-3 ${selectedId === l.listingId ? 'bg-blue-50' : ''}`}
+              onClick={() => {
+                if (busy) return;
+                onSelect(l);
+              }}
+              disabled={busy}
+              className={`w-full text-left px-3 py-3 flex items-center justify-between gap-3 ${selectedId === l.listingId ? 'bg-blue-50' : ''} ${busy ? 'cursor-not-allowed opacity-70' : ''}`}
             >
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{l.title}</div>
-                <div className="text-xs text-gray-600 truncate">{l.location} · {l.listingId}</div>
+                <div className="text-xs text-gray-600 truncate">{l.location} / {l.listingId}</div>
               </div>
-              {selectedId === l.listingId && <CheckCircle2 className="w-5 h-5 text-blue-600" />}
+              {selectedId === l.listingId && (
+                busy ? (
+                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                )
+              )}
             </button>
           </li>
         ))}
@@ -203,7 +318,6 @@ function PropertyStep({ draft, onSelect }: { draft: BrochureDraft | null; onSele
     </section>
   );
 }
-
 function ContentStep({ draft, onChange }: { draft: BrochureDraft | null; onChange: (c: NonNullable<BrochureDraft['content']>) => void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -318,10 +432,10 @@ function ReviewStep({ draft, error, onGenerate, onRetry }: { draft: BrochureDraf
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Summary</h3>
         <div className="text-sm text-gray-700">
-          <div><span className="text-gray-500">Property:</span> {draft?.listingData?.title || '—'} ({draft?.propertyId || '—'})</div>
-          <div><span className="text-gray-500">Location:</span> {draft?.listingData?.location || '—'}</div>
-          <div className="mt-2"><span className="text-gray-500">Title:</span> {draft?.content?.title || '—'}</div>
-          <div><span className="text-gray-500">Description:</span> {draft?.content?.description || '—'}</div>
+          <div><span className="text-gray-500">Property:</span> {draft?.listingData?.title || 'N/A'} ({draft?.propertyId || 'N/A'})</div>
+          <div><span className="text-gray-500">Location:</span> {draft?.listingData?.location || 'N/A'}</div>
+          <div className="mt-2"><span className="text-gray-500">Title:</span> {draft?.content?.title || 'N/A'}</div>
+          <div><span className="text-gray-500">Description:</span> {draft?.content?.description || 'N/A'}</div>
           <div className="mt-2"><span className="text-gray-500">Highlights:</span>
             <ul className="list-disc pl-5 mt-1">
               {(draft?.content?.highlights || []).map((h, i) => (
@@ -329,13 +443,13 @@ function ReviewStep({ draft, error, onGenerate, onRetry }: { draft: BrochureDraf
               ))}
             </ul>
           </div>
-          <div className="mt-2"><span className="text-gray-500">Brand:</span> {draft?.brand?.primary || '—'} / {draft?.brand?.secondary || '—'}</div>
+          <div className="mt-2"><span className="text-gray-500">Brand:</span> {draft?.brand?.primary || 'N/A'} / {draft?.brand?.secondary || 'N/A'}</div>
         </div>
         <div className="mt-4">
           <button type="button" onClick={onGenerate} className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             Render PDF
           </button>
-          {draft?.status === 'generating' && <span className="ml-3 text-sm text-blue-700">Generating…</span>}
+          {draft?.status === 'generating' && <span className="ml-3 text-sm text-blue-700">Generating...</span>}
           {draft?.status === 'ready' && <span className="ml-3 text-sm text-emerald-700">Ready</span>}
           {draft?.status === 'error' && (
             <span className="ml-3 text-sm text-red-700">{error || 'Generation failed.'} <button type="button" onClick={onRetry} className="underline">Retry</button></span>

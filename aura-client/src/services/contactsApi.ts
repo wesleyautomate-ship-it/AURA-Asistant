@@ -14,14 +14,35 @@ const inMemoryTags = new Map<string, string[]>();
 
 export async function getContacts(signal?: AbortSignal): Promise<Contact[]> {
   ensureRealApi();
-  const { data: rows } = await api.get<Array<Contact & { status?: string }>>(
-    '/contacts',
-    { signal },
-  );
-  return rows.map((row) => ({
-    ...row,
-    tags: inMemoryTags.get(row.id) || [],
-  }));
+  const collected: Contact[] = [];
+  const pageSize = 100;
+  let offset = 0;
+  while (true) {
+    const { data: rows } = await api.get<Array<Contact & { status?: string }>>(
+      '/contacts',
+      {
+        signal,
+        params: {
+          limit: pageSize,
+          offset,
+        },
+      },
+    );
+    if (!Array.isArray(rows) || rows.length === 0) {
+      break;
+    }
+    rows.forEach((row) => {
+      collected.push({
+        ...row,
+        tags: inMemoryTags.get(row.id) || [],
+      });
+    });
+    if (rows.length < pageSize) {
+      break;
+    }
+    offset += rows.length;
+  }
+  return collected;
 }
 
 export async function getContactDetail(
