@@ -1,9 +1,10 @@
-rop_git.md
-
 # Dependencies
 node_modules/
 
-# Python cache
+# Python environments and cache
+.venv/
+**/.venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -15,6 +16,8 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.local
 
 # IDE
 .vscode/
@@ -41,7 +44,9 @@ logs/
 *.tar.gz
 *.rar
 
-# Testing
+# Testing / generated artifacts
 .coverage
+htmlcov/
 .pytest_cache/
 .tox/
+.audit_runs/
